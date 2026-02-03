@@ -1,10 +1,10 @@
 // app/dashboard/notifications/setup/page.tsx
 import { redirect } from "next/navigation";
-import { createServerSupabase } from "@/lib/supabase/server";
+import { createSupabaseServerClient } from "@/lib/supabase/server-client";
 import NotificationsSetupClient from "./NotificationsSetupClient";
 
 export default async function NotificationsSetupPage() {
-  const supabase = await createServerSupabase();
+  const supabase = await createSupabaseServerClient();
 
   // 1) Require authenticated user
   const {
@@ -25,7 +25,7 @@ export default async function NotificationsSetupPage() {
     emailEnabled: prefs?.email_enabled ?? false,
     inAppEnabled: prefs?.in_app_enabled ?? true,
     smartDefaults: prefs?.smart_defaults ?? true,
-    intensity: prefs?.intensity ?? "medium",
+    intensity: (prefs?.intensity ?? "medium") as "low" | "medium" | "high",
   };
 
   return (
