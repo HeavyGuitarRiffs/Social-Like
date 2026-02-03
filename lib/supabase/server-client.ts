@@ -17,7 +17,7 @@ function getEnvironmentVariables() {
   return { supabaseUrl, supabaseAnonKey };
 }
 
-export async function createServerSupabase() {
+export async function createSupabaseServerClient() {
   const { supabaseUrl, supabaseAnonKey } = getEnvironmentVariables();
   const cookieStore = await cookies();
 
