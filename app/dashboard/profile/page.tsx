@@ -1,11 +1,11 @@
 // app/dashboard/profile/page.tsx
 import { redirect } from "next/navigation";
-import { createServerSupabase } from "@/lib/supabase/server-client";
+import { createSupabaseServerClient } from "@/lib/supabase/server-client";
 import ProfilePageClient from "./ProfilePageClient";
 import type { UserAvatar, SocialLink } from "./types";
 
 export default async function ProfilePage() {
-  const supabase = await createServerSupabase();
+  const supabase = await createSupabaseServerClient();
 
   // 1) Require authenticated user
   const {
