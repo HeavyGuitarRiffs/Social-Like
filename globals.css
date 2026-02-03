@@ -1,0 +1,352 @@
+/* ============================================================
+   Load full Tailwind engine
+   ============================================================ */
+@import "tailwindcss";
+
+/* ============================================================
+   DESIGN TOKENS — DARK MODE DEFAULT
+   ============================================================ */
+
+:root {
+  /* DARK MODE (default) */
+  --brand-primary: #7C3AED;
+  --brand-secondary: #22C55E;
+
+  --brand-bg: #0B1020;
+  --brand-card: #0F172A;
+  --brand-glass: rgba(11, 16, 32, 0.6);
+
+  --brand-text: #ffffff;
+  --brand-text-secondary: rgba(255, 255, 255, 0.82);
+  --brand-muted: rgba(255, 255, 255, 0.65);
+  --brand-faint: rgba(255, 255, 255, 0.45);
+
+  --background: var(--brand-bg);
+  --foreground: var(--brand-text);
+
+  --primary: var(--brand-primary);
+  --primary-foreground: #000000;
+
+  --secondary: var(--brand-secondary);
+  --secondary-foreground: #000000;
+
+  --card: var(--brand-card);
+  --card-foreground: var(--brand-text);
+
+  --muted: var(--brand-muted);
+  --muted-foreground: var(--brand-faint);
+
+  --input: var(--brand-card);
+  --ring: var(--brand-primary);
+
+  --radius: 0.75rem;
+}
+
+/* ============================================================
+   LIGHT MODE — HIGH CONTRAST, NEVER INVISIBLE
+   ============================================================ */
+
+.light {
+  --brand-bg: #ffffff;
+  --brand-card: #f2f4f8; /* slightly grey so white text never disappears */
+  --brand-glass: rgba(255, 255, 255, 0.6);
+
+  --brand-text: #0B1020; /* strong black */
+  --brand-text-secondary: rgba(0, 0, 0, 0.75);
+  --brand-muted: rgba(0, 0, 0, 0.55);
+  --brand-faint: rgba(0, 0, 0, 0.35);
+
+  --background: var(--brand-bg);
+  --foreground: var(--brand-text);
+
+  --card: var(--brand-card);
+  --card-foreground: var(--brand-text);
+
+  --muted: var(--brand-muted);
+  --muted-foreground: var(--brand-faint);
+
+  --input: var(--brand-card);
+  --ring: var(--brand-primary);
+}
+
+/* ============================================================
+   TAILWIND RESET / BASE
+   ============================================================ */
+
+@import "tailwindcss/preflight";
+@tailwind utilities;
+
+/* ============================================================
+   GLOBAL BASE STYLES
+   ============================================================ */
+
+html,
+body {
+  min-height: 100%;
+  margin: 0;
+  padding: 0;
+  font-family: var(--font-space), system-ui, sans-serif;
+  background-color: var(--background);
+  color: var(--foreground);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+/* ============================================================
+   TYPOGRAPHY (conversion-first hierarchy)
+   ============================================================ */
+
+h1,
+h2,
+h3,
+h4,
+h5 {
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  color: var(--brand-text);
+}
+
+h1 {
+  font-size: clamp(3rem, 6vw, 5.5rem);
+  font-weight: 900;
+  letter-spacing: -0.035em;
+  line-height: 1.05;
+}
+
+h2 {
+  font-size: clamp(2.25rem, 4.5vw, 3.75rem);
+  line-height: 1.1;
+}
+
+h3 {
+  font-size: 1.5rem;
+}
+
+p {
+  max-width: 42rem;
+  line-height: 1.7;
+  color: var(--brand-text-secondary);
+}
+
+small,
+.label {
+  color: var(--brand-muted);
+  font-size: 0.875rem;
+}
+
+.hero-title {}
+.hero-subtitle {
+  font-size: 1.25rem;
+  max-width: 38rem;
+  color: var(--brand-text-secondary);
+  line-height: 1.65;
+}
+
+/* ============================================================
+   SECTION SPACING
+   ============================================================ */
+
+.section {
+  padding-top: 10rem;
+  padding-bottom: 10rem;
+}
+
+.section-tight {
+  padding-top: 6rem;
+  padding-bottom: 6rem;
+}
+
+.section-loose {
+  padding-top: 14rem;
+  padding-bottom: 14rem;
+}
+
+/* ============================================================
+   COMPONENTS
+   ============================================================ */
+
+@layer components {
+  /* Buttons */
+  .app-btn {
+    @apply inline-flex items-center justify-center font-semibold transition-all rounded-xl;
+  }
+
+  .app-btn-primary {
+    background-color: var(--brand-primary);
+    color: black;
+    box-shadow: 0 10px 25px color-mix(in srgb, var(--brand-primary) 25%, transparent);
+  }
+
+  .app-btn-primary:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 14px 32px color-mix(in srgb, var(--brand-primary) 35%, transparent);
+  }
+
+  .app-btn-outline {
+    border: 1px solid var(--brand-primary);
+    background-color: transparent;
+    color: var(--brand-text);
+  }
+
+  /* Cards */
+  .app-card {
+    background-color: var(--brand-card);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 1.25rem;
+    padding: 2rem;
+  }
+
+  .app-card-soft {
+    background-color: rgba(255, 255, 255, 0.03);
+    border-radius: 1.25rem;
+    padding: 2rem;
+  }
+
+  .app-card-title {
+    font-size: 1.25rem;
+    font-weight: 700;
+  }
+
+  /* Tables */
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    border-radius: 1rem;
+    overflow: hidden;
+    background-color: var(--brand-card);
+  }
+
+  th,
+  td {
+    padding: 1rem 1.25rem;
+    text-align: left;
+  }
+
+  th {
+    font-size: 0.875rem;
+    text-transform: uppercase;
+    color: var(--brand-muted);
+    background-color: rgba(255, 255, 255, 0.03);
+  }
+
+  tr:not(:last-child) td {
+    border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  }
+
+  /* Avatars */
+  .avatar {
+    width: 3rem;
+    height: 3rem;
+    border-radius: 9999px;
+    background-color: rgba(255, 255, 255, 0.15);
+    flex-shrink: 0;
+  }
+
+  /* Nav links */
+  .nav-link {
+    font-size: 0.875rem;
+    font-weight: 500;
+    opacity: 0.7;
+    transition: opacity 0.2s ease;
+  }
+
+  .nav-link:hover {
+    opacity: 1;
+  }
+}
+
+/* ============================================================
+   GLASS / FLOATING UI
+   ============================================================ */
+
+.glass {
+  background-color: var(--brand-glass);
+  backdrop-filter: blur(1.25rem);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 1.25rem;
+}
+
+/* ============================================================
+   Z-INDEX HELPERS
+   ============================================================ */
+
+.z-base { z-index: 1; }
+.z-float { z-index: 10; }
+.z-overlay { z-index: 50; }
+.z-toast { z-index: 80; }
+
+/* ============================================================
+   CONTAINERS
+   ============================================================ */
+
+.container {
+  max-width: 72rem;
+  margin-left: auto;
+  margin-right: auto;
+  padding-left: 1.5rem;
+  padding-right: 1.5rem;
+}
+
+/* ============================================================
+   UTILITIES
+   ============================================================ */
+
+.muted {
+  color: var(--brand-muted);
+}
+
+.border-soft {
+  border: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+/* ============================================================
+   RESPONSIVENESS
+   ============================================================ */
+
+.hero-title {
+  font-size: 2.25rem;
+}
+.hero-subtitle {
+  font-size: 1rem;
+}
+
+@media (min-width: 640px) {
+  .hero-title {
+    font-size: 3rem;
+  }
+  .hero-subtitle {
+    font-size: 1.125rem;
+  }
+}
+
+@media (min-width: 1024px) {
+  .hero-title {
+    font-size: clamp(3.5rem, 6vw, 5.5rem);
+  }
+  .hero-subtitle {
+    font-size: 1.25rem;
+  }
+}
+
+.app-card {
+  width: 100%;
+}
+
+@media (min-width: 768px) {
+  .app-card {
+    max-width: 22rem;
+  }
+}
+
+footer > div {
+  flex-direction: column;
+  text-align: center;
+}
+
+@media (min-width: 768px) {
+  footer > div {
+    flex-direction: row;
+    justify-content: space-between;
+    text-align: left;
+  }
+}
