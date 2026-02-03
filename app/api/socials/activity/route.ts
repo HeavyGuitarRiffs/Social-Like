@@ -1,6 +1,6 @@
 // app/api/socials/activity/route.ts
 import { NextRequest, NextResponse } from "next/server";
-import { createServerSupabase } from "@/lib/supabase/server-client";
+import { createServerSupabase } from "@/lib/supabase/server-client"
 import type { Json } from "@/supabase/types";
 
 type ActivityEvent = {
