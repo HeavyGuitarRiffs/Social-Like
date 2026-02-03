@@ -1,57 +1,42 @@
-import { redirect } from "next/navigation";
-import { createServerSupabase } from "@/lib/supabase/server-client";
+// app/layout.tsx
+import type { Metadata } from "next";
+import { Space_Grotesk } from "next/font/google";
+import "./globals.css";
 
-export default async function DashboardLayout({ children }: { children: React.ReactNode }) {
-  const supabase = await createServerSupabase();
+import { ThemeProvider } from "next-themes";
+import { TooltipProvider } from "@/components/ui/tooltip";
+import { Toaster } from "@/components/ui/sonner";
+import { UserProvider } from "@/components/providers/UserProvider";
 
-  const {
-    data: { session },
-  } = await supabase.auth.getSession();
+import TopNav from "@/components/TopNav";
+import { Footer } from "@/components/Footer";
 
-  if (!session?.user) {
-    redirect("/login");
-  }
+const spaceGrotesk = Space_Grotesk({
+  subsets: ["latin"],
+  weight: ["400", "500", "600", "700"],
+  variable: "--font-space",
+});
 
-  // Fetch the user's plan_id
-  const { data: userPlan } = await supabase
-    .from("user_plans")
-    .select("plan_id")
-    .eq("user_id", session.user.id)
-    .single();
+export const metadata: Metadata = {
+  title: "Social Like",
+  description: "Track social growth. Convert attention into income.",
+};
 
-  const planId = userPlan?.plan_id || "free";
-
-  // Fetch plan details
-  const { data: plan } = await supabase
-    .from("plans")
-    .select("id, name")
-    .eq("id", planId)
-    .single();
-
-  const planName = plan?.name || "Free";
-
+export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <div className="min-h-screen flex bg-base-100 text-base-content">
-      <aside className="hidden md:flex w-64 flex-col border-r bg-base-200 p-6 gap-6">
-        <h2 className="text-xl font-bold">Dashboard</h2>
-
-        <p className="text-sm opacity-70">Plan: {planName}</p>
-
-        <nav className="flex flex-col gap-3 text-sm">
-          <a href="/dashboard" className="hover:opacity-80">Overview</a>
-          <a href="/dashboard/profile" className="hover:opacity-80">Profile</a>
-          <a href="/dashboard/monetization" className="hover:opacity-80">Monetization</a>
-          <a href="/dashboard/goals" className="hover:opacity-80">Goals</a>
-          <a href="/dashboard/achievements" className="hover:opacity-80">Achievements</a>
-          <a href="/dashboard/insights" className="hover:opacity-80">Insights</a>
-          <a href="/dashboard/analytics" className="hover:opacity-80">Analytics</a>
-          <a href="/dashboard/linktree" className="hover:opacity-80">Linktree</a>
-          
-          <a href="/dashboard/m" className="hover:opacity-80"></a>
-        </nav>
-      </aside>
-
-      <main className="flex-1 p-6">{children}</main>
-    </div>
+    <html lang="en" className={spaceGrotesk.variable} suppressHydrationWarning>
+      <body className="min-h-screen flex flex-col antialiased bg-background text-foreground">
+        <ThemeProvider attribute="class" defaultTheme="dark" enableSystem={false}>
+          <UserProvider>
+            <TooltipProvider>
+              <TopNav />
+              <main className="flex-1">{children}</main>
+              <Footer />
+              <Toaster richColors closeButton />
+            </TooltipProvider>
+          </UserProvider>
+        </ThemeProvider>
+      </body>
+    </html>
   );
 }
