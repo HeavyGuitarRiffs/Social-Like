@@ -1,6 +1,6 @@
 // app/api/socials/fetch/route.ts
 import { NextRequest, NextResponse } from "next/server";
-import { createClient } from "@/lib/supabase/server";
+import { createServerSupabase } from "@/lib/supabase/server-client";
 
 export async function POST(req: NextRequest) {
   try {
@@ -13,7 +13,7 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const supabase = createClient();
+    const supabase = await createServerSupabase();
 
     const { data, error } = await supabase
       .from("user_socials")
@@ -23,17 +23,13 @@ export async function POST(req: NextRequest) {
     if (error) throw error;
 
     return NextResponse.json({ socials: data });
-  } catch (err: unknown) {
-    if (err instanceof Error) {
-      console.error("Fetch socials error:", err.message);
-      return NextResponse.json(
-        { error: err.message },
-        { status: 500 }
-      );
-    }
+  } catch (err) {
+    console.error("Fetch socials error:", err);
 
     return NextResponse.json(
-      { error: "Unknown error" },
+      {
+        error: err instanceof Error ? err.message : "Unknown error",
+      },
       { status: 500 }
     );
   }

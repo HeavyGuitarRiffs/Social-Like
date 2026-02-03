@@ -1,14 +1,15 @@
 // app/api/socials/save/route.ts
 import { NextRequest, NextResponse } from "next/server";
-import { createClient } from "@/lib/supabase/server";
+import { createServerSupabase } from "@/lib/supabase/server-client";
 
-// Define the expected shape of each social link coming from the client
 type SocialInput = {
   id: string;
   handle: string;
   enabled: boolean;
   linktree?: boolean;
-  metrics?: { power_level: number };
+  metrics?: {
+    power_level: number;
+  };
 };
 
 type RequestBody = {
@@ -21,50 +22,53 @@ export async function POST(req: NextRequest) {
     const body: RequestBody = await req.json();
     const { user_id, socials } = body;
 
-    // IMPORTANT: use server-side Supabase client
-    const supabase = createClient();
+    const supabase = await createServerSupabase();
 
     for (const social of socials) {
       if (!social.handle) continue;
 
-      // Upsert the social link
-      const { error } = await supabase
+      // 1) user_socials (typed correctly)
+      const { error: socialError } = await supabase
         .from("user_socials")
         .upsert({
           id: social.id,
           user_id,
           handle: social.handle,
           enabled: social.enabled,
-          linktree: social.linktree || false,
+          linktree: social.linktree ?? false,
         });
 
-      if (error) throw error;
+      if (socialError) throw socialError;
 
-      // Optional: upsert metrics if present
+      // 2) social_power_level (Supabase types are broken → override builder)
       if (social.metrics) {
-        const { error: metricsError } = await supabase
-          .from("social_metrics")
-          .upsert({
-            social_id: social.id,
-            power_level: social.metrics.power_level,
-          });
+        const powerLevelTable = supabase.from(
+          "social_power_level"
+        ) as unknown as {
+          upsert: (values: {
+            social_id: string;
+            power_level: number;
+          }) => Promise<{ error: Error | null }>;
+        };
 
-        if (metricsError) throw metricsError;
+        const { error } = await powerLevelTable.upsert({
+          social_id: social.id,
+          power_level: social.metrics.power_level,
+        });
+
+        if (error) throw error;
       }
     }
 
     return NextResponse.json({ status: "success" });
-  } catch (err: unknown) {
-    if (err instanceof Error) {
-      console.error("Save socials error:", err.message);
-      return NextResponse.json(
-        { status: "error", message: err.message },
-        { status: 500 }
-      );
-    }
+  } catch (err) {
+    console.error("Save socials error:", err);
 
     return NextResponse.json(
-      { status: "error", message: "Unknown error" },
+      {
+        status: "error",
+        message: err instanceof Error ? err.message : "Unknown error",
+      },
       { status: 500 }
     );
   }

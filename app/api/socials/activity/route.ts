@@ -1,6 +1,7 @@
 // app/api/socials/activity/route.ts
 import { NextRequest, NextResponse } from "next/server";
-import { createClient } from "@/lib/supabase/server";
+import { createServerSupabase } from "@/lib/supabase/server-client";
+import type { Json } from "@/supabase/types";
 
 type ActivityEvent = {
   user_id: string;
@@ -25,7 +26,7 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const supabase = createClient();
+    const supabase = await createServerSupabase();
 
     const payload = body.events.map((e) => ({
       user_id: e.user_id,
@@ -34,24 +35,23 @@ export async function POST(req: NextRequest) {
       event_timestamp: e.event_timestamp
         ? new Date(e.event_timestamp).toISOString()
         : new Date().toISOString(),
-      metadata: e.metadata ?? {},
+      metadata: (e.metadata ?? {}) as Json,
     }));
 
-    const { error } = await supabase.from("social_activity").insert(payload);
+    const { error } = await supabase
+      .from("social_activity")
+      .insert(payload);
 
     if (error) throw error;
 
     return NextResponse.json({ status: "ok" });
   } catch (err) {
-    if (err instanceof Error) {
-      return NextResponse.json(
-        { error: err.message },
-        { status: 500 }
-      );
-    }
+    console.error("Social activity error:", err);
 
     return NextResponse.json(
-      { error: "Unknown error" },
+      {
+        error: err instanceof Error ? err.message : "Unknown error",
+      },
       { status: 500 }
     );
   }

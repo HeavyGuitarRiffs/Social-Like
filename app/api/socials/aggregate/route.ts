@@ -1,6 +1,8 @@
 // app/api/socials/aggregate/route.ts
 import { NextRequest, NextResponse } from "next/server";
-import { createClient } from "@/lib/supabase/server";
+import { createServerSupabase } from "@/lib/supabase/server-client";
+
+
 
 export async function POST(req: NextRequest) {
   try {
@@ -13,7 +15,7 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const supabase = createClient();
+    const supabase = await createServerSupabase();
 
     // 1. Fetch all raw activity for this user
     const { data: events, error } = await supabase
@@ -23,7 +25,6 @@ export async function POST(req: NextRequest) {
 
     if (error) throw error;
 
-    // 2. Group by platform + date
     const dailyMap = new Map<
       string,
       {
@@ -46,14 +47,16 @@ export async function POST(req: NextRequest) {
       }
     >();
 
-    for (const e of events) {
+    for (const e of events ?? []) {
       const platform = e.platform;
-      const date = new Date(e.event_timestamp).toISOString().slice(0, 10);
-      const key = `${platform}_${date}`;
+      const date = new Date(e.event_timestamp)
+        .toISOString()
+        .slice(0, 10);
 
-      // Initialize daily bucket
-      if (!dailyMap.has(key)) {
-        dailyMap.set(key, {
+      const dailyKey = `${platform}_${date}`;
+
+      if (!dailyMap.has(dailyKey)) {
+        dailyMap.set(dailyKey, {
           comments: 0,
           posts: 0,
           likes: 0,
@@ -62,7 +65,6 @@ export async function POST(req: NextRequest) {
         });
       }
 
-      // Initialize totals bucket
       if (!totalsMap.has(platform)) {
         totalsMap.set(platform, {
           comments: 0,
@@ -73,32 +75,39 @@ export async function POST(req: NextRequest) {
         });
       }
 
-      const daily = dailyMap.get(key)!;
+      const daily = dailyMap.get(dailyKey)!;
       const total = totalsMap.get(platform)!;
 
-      // Count events
       switch (e.event_type) {
         case "comment":
           daily.comments++;
           total.comments++;
           break;
+
         case "post":
           daily.posts++;
           total.posts++;
           break;
+
         case "like":
           daily.likes++;
           total.likes++;
           break;
+
         case "session_start":
           daily.sessions++;
           total.sessions++;
           break;
-        case "session_end":
-          const duration = e.metadata?.duration_seconds ?? 0;
+
+        case "session_end": {
+          const duration =
+            (e.metadata as { duration_seconds?: number })
+              ?.duration_seconds ?? 0;
+
           daily.totalTime += duration;
           total.totalTime += duration;
           break;
+        }
       }
     }
 
@@ -139,15 +148,12 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({ status: "aggregated" });
   } catch (err) {
-    if (err instanceof Error) {
-      return NextResponse.json(
-        { error: err.message },
-        { status: 500 }
-      );
-    }
+    console.error("Aggregate socials error:", err);
 
     return NextResponse.json(
-      { error: "Unknown error" },
+      {
+        error: err instanceof Error ? err.message : "Unknown error",
+      },
       { status: 500 }
     );
   }

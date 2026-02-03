@@ -1,11 +1,11 @@
 // app/dashboard/success/page.tsx
 import { redirect } from "next/navigation";
-import { createSupabaseServerClient } from "@/lib/supabase/server-client";
+import { createServerSupabase } from "@/lib/supabase/server-client";
+
 import SuccessPageClient from "./SuccessPageClient";
 
 export default async function SuccessPage() {
-  const supabase = await createSupabaseServerClient();
-
+  const supabase = await createServerSupabase();
 
   // Require authenticated user
   const {
