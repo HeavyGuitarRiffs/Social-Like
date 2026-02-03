@@ -1,6 +1,6 @@
 // app/api/socials/aggregate/route.ts
 import { NextRequest, NextResponse } from "next/server";
-import { createServerSupabase } from "@/lib/supabase/server-client";
+import { createServerSupabase } from "@/lib/supabase/server-client"
 
 
 
