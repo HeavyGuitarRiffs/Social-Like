@@ -37,3 +37,5 @@ supabase/.local
 # Uploads (if any)
 uploads/
 public/uploads/
+.vercel
+.env*.local
