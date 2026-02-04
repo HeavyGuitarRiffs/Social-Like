@@ -112,16 +112,15 @@ export default function ProfilePageClient({
         avatar_url = data.publicUrl;
       }
 
-      const { error: profileError } = await supabase
-        .from("user_avatars")
-        .upsert({
-          user_id: userId,
-          display_name: displayName,
-          bio,
-          country,
-          timezone,
-          avatar_url,
-        });
+     const { error: profileError } = await supabase
+  .from("user_avatars")
+  .upsert({
+    user_id: userId,
+    avatar_url: avatar_url ?? "",
+    display_name: displayName ?? "",
+    bio: bio ?? "",
+    country: country ?? "",
+  });
 
       if (profileError) throw profileError;
 
