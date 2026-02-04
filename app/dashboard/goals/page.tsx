@@ -1,10 +1,10 @@
 import { redirect } from "next/navigation";
-import { createServerSupabase } from "@/lib/supabase/server-client";
+import { createSupabaseServerClient } from "@/lib/supabase/server-client";
 import GoalsPageClient from "./GoalsPageClient";
 import type { GoalsPayload } from "./types";
 
 export default async function GoalsPage() {
-  const supabase = await createServerSupabase();
+  const supabase = await createSupabaseServerClient();
 
   const {
     data: { user },

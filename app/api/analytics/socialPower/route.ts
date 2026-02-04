@@ -1,7 +1,6 @@
 // app/api/analytics/socialPower/route.ts
 import { NextRequest, NextResponse } from "next/server";
-import { createServerSupabase } from "@/lib/supabase/server-client";
-
+import { createSupabaseServerClient } from "@/lib/supabase/server-client";
 
 export async function POST(req: NextRequest) {
   try {
@@ -14,8 +13,7 @@ export async function POST(req: NextRequest) {
       );
     }
 
-const supabase = await createServerSupabase();
-
+    const supabase = await createSupabaseServerClient();
 
     const { data, error } = await supabase
       .from("social_power_level")

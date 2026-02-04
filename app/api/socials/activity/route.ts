@@ -1,6 +1,6 @@
 // app/api/socials/activity/route.ts
 import { NextRequest, NextResponse } from "next/server";
-import { createServerSupabase } from "@/lib/supabase/server-client"
+import { createSupabaseServerClient } from "@/lib/supabase/server-client";
 import type { Json } from "@/supabase/types";
 
 type ActivityEvent = {
@@ -26,7 +26,7 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const supabase = await createServerSupabase();
+    const supabase = await createSupabaseServerClient();
 
     const payload = body.events.map((e) => ({
       user_id: e.user_id,

@@ -1,8 +1,6 @@
 // app/api/socials/aggregate/route.ts
 import { NextRequest, NextResponse } from "next/server";
-import { createServerSupabase } from "@/lib/supabase/server-client"
-
-
+import { createSupabaseServerClient } from "@/lib/supabase/server-client";
 
 export async function POST(req: NextRequest) {
   try {
@@ -15,7 +13,7 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const supabase = await createServerSupabase();
+    const supabase = await createSupabaseServerClient();
 
     // 1. Fetch all raw activity for this user
     const { data: events, error } = await supabase

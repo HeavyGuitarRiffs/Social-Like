@@ -1,11 +1,11 @@
 // app/dashboard/connect/page.tsx
 import { redirect } from "next/navigation";
-import { createServerSupabase } from "@/lib/supabase/server-client";
+import { createSupabaseServerClient } from "@/lib/supabase/server-client";
 import ConnectPageClient from "./ConnectPageClient";
 import type { SocialLink } from "./types";
 
 export default async function ConnectPage() {
-  const supabase = await createServerSupabase();
+  const supabase = await createSupabaseServerClient();
 
   // 1) Require authenticated user
   const {

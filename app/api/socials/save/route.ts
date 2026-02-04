@@ -1,6 +1,6 @@
 // app/api/socials/save/route.ts
 import { NextRequest, NextResponse } from "next/server";
-import { createServerSupabase } from "@/lib/supabase/server-client";
+import { createSupabaseServerClient } from "@/lib/supabase/server-client";
 
 type SocialInput = {
   id: string;
@@ -22,7 +22,7 @@ export async function POST(req: NextRequest) {
     const body: RequestBody = await req.json();
     const { user_id, socials } = body;
 
-    const supabase = await createServerSupabase();
+    const supabase = await createSupabaseServerClient();
 
     for (const social of socials) {
       if (!social.handle) continue;

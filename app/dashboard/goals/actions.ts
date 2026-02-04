@@ -1,10 +1,10 @@
 "use server";
 
-import { createServerSupabase } from "@/lib/supabase/server-client";
+import { createSupabaseServerClient } from "@/lib/supabase/server-client";
 import type { GoalsPayload } from "./types";
 
 export async function saveGoals(userId: string, goals: GoalsPayload) {
-  const supabase = await createServerSupabase();
+  const supabase = await createSupabaseServerClient();
 
   const { error } = await supabase
     .from("user_goals")
