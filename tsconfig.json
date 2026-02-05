@@ -24,9 +24,7 @@
 
     "paths": {
       "@/*": ["./*"]
-    },
-
-    "ignoreDeprecations": "6.0"
+    }
   },
   "include": [
     "next-env.d.ts",
@@ -38,6 +36,6 @@
   ],
   "exclude": [
     "node_modules",
-    "supabase/functions"   // <-- 🚀 FIX: exclude Deno edge functions
+    "supabase/functions"
   ]
 }
