@@ -1,17 +1,41 @@
 // lib/socials/soundcloud.ts
 
-export async function syncSoundCloud(account: any, supabase: any) {
-  const { access_token, user_id } = account;
+import type { Account } from "./socialIndex";
+import type { SupabaseClient } from "@supabase/supabase-js";
+import type { Database } from "@/supabase/types";
+
+export async function syncSoundCloud(
+  account: Account,
+  supabase: SupabaseClient<Database>
+) {
+  const {
+    account_id,
+    user_id,
+    access_token,
+    refresh_token,
+    expires_at,
+  } = account as unknown as {
+    account_id: string;
+    user_id: string;
+    access_token: string;
+    refresh_token?: string;
+    expires_at?: number;
+  };
 
   if (!access_token) {
     return {
       platform: "soundcloud",
       updated: false,
       error: "Missing access token",
+      account_id,
     };
   }
 
-  const refreshed = await refreshSoundCloudTokenIfNeeded(account, supabase);
+  // SoundCloud refresh placeholder (kept consistent with universal pattern)
+  const refreshed = await refreshSoundCloudTokenIfNeeded(
+    { account_id, user_id, access_token, refresh_token, expires_at },
+    supabase
+  );
 
   const profile = await fetchSoundCloudProfile(refreshed.access_token);
   const posts = await fetchSoundCloudTracks(refreshed.access_token);
@@ -19,7 +43,11 @@ export async function syncSoundCloud(account: any, supabase: any) {
   const normalizedProfile = normalizeSoundCloudProfile(profile);
   const normalizedPosts = posts.map(normalizeSoundCloudTrack);
 
+  /* ---------------------------------
+     social_profiles
+  ----------------------------------*/
   await supabase.from("social_profiles").upsert({
+    account_id,
     user_id,
     platform: "soundcloud",
     username: normalizedProfile.username,
@@ -29,8 +57,17 @@ export async function syncSoundCloud(account: any, supabase: any) {
     last_synced: new Date().toISOString(),
   });
 
+  /* ---------------------------------
+     social_posts
+  ----------------------------------*/
   if (normalizedPosts.length > 0) {
-    await supabase.from("social_posts").upsert(normalizedPosts);
+    await supabase.from("social_posts").upsert(
+      normalizedPosts.map((p) => ({
+        ...p,
+        user_id,
+        account_id,
+      }))
+    );
   }
 
   return {
@@ -38,16 +75,67 @@ export async function syncSoundCloud(account: any, supabase: any) {
     updated: true,
     posts: normalizedPosts.length,
     metrics: true,
+    account_id,
   };
 }
 
-/* Helpers */
+/* -----------------------------
+   Local Types
+------------------------------*/
 
-async function refreshSoundCloudTokenIfNeeded(account: any, supabase: any) {
-  return account;
+type RawSoundCloudProfile = {
+  username?: string;
+  avatar_url?: string;
+  followers_count?: number;
+  following_count?: number;
+};
+
+type RawSoundCloudTrack = {
+  id: string;
+  title?: string;
+  artwork_url?: string;
+  playback_count?: number;
+  comment_count?: number;
+  created_at?: string;
+};
+
+type NormalizedProfile = {
+  username: string;
+  avatar_url: string;
+  followers: number;
+  following: number;
+};
+
+type NormalizedPost = {
+  platform: string;
+  post_id: string;
+  caption: string;
+  media_url: string;
+  likes: number;
+  comments: number;
+  posted_at: string;
+};
+
+/* -----------------------------
+   Helpers
+------------------------------*/
+
+async function refreshSoundCloudTokenIfNeeded(
+  account: {
+    account_id: string;
+    user_id: string;
+    access_token: string;
+    refresh_token?: string;
+    expires_at?: number;
+  },
+  supabase: SupabaseClient<Database>
+) {
+  return account; // placeholder logic
 }
 
-async function fetchSoundCloudProfile(accessToken: string) {
+async function fetchSoundCloudProfile(
+  accessToken: string
+): Promise<RawSoundCloudProfile> {
   return {
     username: "Placeholder Artist",
     avatar_url: "",
@@ -56,7 +144,9 @@ async function fetchSoundCloudProfile(accessToken: string) {
   };
 }
 
-async function fetchSoundCloudTracks(accessToken: string) {
+async function fetchSoundCloudTracks(
+  accessToken: string
+): Promise<RawSoundCloudTrack[]> {
   return [
     {
       id: "1",
@@ -69,7 +159,9 @@ async function fetchSoundCloudTracks(accessToken: string) {
   ];
 }
 
-function normalizeSoundCloudProfile(raw: any) {
+function normalizeSoundCloudProfile(
+  raw: RawSoundCloudProfile
+): NormalizedProfile {
   return {
     username: raw.username ?? "",
     avatar_url: raw.avatar_url ?? "",
@@ -78,7 +170,9 @@ function normalizeSoundCloudProfile(raw: any) {
   };
 }
 
-function normalizeSoundCloudTrack(raw: any) {
+function normalizeSoundCloudTrack(
+  raw: RawSoundCloudTrack
+): NormalizedPost {
   return {
     platform: "soundcloud",
     post_id: raw.id,

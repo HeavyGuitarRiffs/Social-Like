@@ -1,10 +1,24 @@
 // lib/socials/letterboxd.ts
 
-export async function syncLetterboxd(account: any, supabase: any) {
-  const { username, user_id } = account;
+import type { Account } from "./socialIndex";
+import type { SupabaseClient } from "@supabase/supabase-js";
+import type { Database } from "@/supabase/types";
+
+export async function syncLetterboxd(
+  account: Account,
+  supabase: SupabaseClient<Database>
+) {
+  const { username, user_id } = account as unknown as {
+    username: string;
+    user_id: string;
+  };
 
   if (!username) {
-    return { platform: "letterboxd", updated: false, error: "Missing username" };
+    return {
+      platform: "letterboxd",
+      updated: false,
+      error: "Missing username",
+    };
   }
 
   const profile = await fetchLetterboxdProfile(username);
@@ -24,15 +38,67 @@ export async function syncLetterboxd(account: any, supabase: any) {
   });
 
   if (normalizedPosts.length > 0) {
-    await supabase.from("social_posts").upsert(normalizedPosts);
+    await supabase.from("social_posts").upsert(
+      normalizedPosts.map((p) => ({
+        ...p,
+        user_id,
+      }))
+    );
   }
 
-  return { platform: "letterboxd", updated: true, posts: normalizedPosts.length, metrics: true };
+  return {
+    platform: "letterboxd",
+    updated: true,
+    posts: normalizedPosts.length,
+    metrics: true,
+  };
 }
 
-/* Helpers */
+/* -----------------------------
+   Local Types
+------------------------------*/
 
-async function fetchLetterboxdProfile(username: string) {
+type RawLetterboxdProfile = {
+  username?: string;
+  avatar_url?: string;
+  followers?: number;
+  following?: number;
+};
+
+type RawLetterboxdReview = {
+  id: string;
+  film?: string;
+  review?: string;
+  rating?: number;
+  likes?: number;
+  comments?: number;
+  created_at?: string;
+};
+
+type NormalizedProfile = {
+  username: string;
+  avatar_url: string;
+  followers: number;
+  following: number;
+};
+
+type NormalizedPost = {
+  platform: string;
+  post_id: string;
+  caption: string;
+  media_url: string;
+  likes: number;
+  comments: number;
+  posted_at: string;
+};
+
+/* -----------------------------
+   Placeholder Fetchers
+------------------------------*/
+
+async function fetchLetterboxdProfile(
+  username: string
+): Promise<RawLetterboxdProfile> {
   return {
     username: "Placeholder Letterboxd User",
     avatar_url: "",
@@ -41,7 +107,9 @@ async function fetchLetterboxdProfile(username: string) {
   };
 }
 
-async function fetchLetterboxdReviews(username: string) {
+async function fetchLetterboxdReviews(
+  username: string
+): Promise<RawLetterboxdReview[]> {
   return [
     {
       id: "1",
@@ -55,7 +123,13 @@ async function fetchLetterboxdReviews(username: string) {
   ];
 }
 
-function normalizeLetterboxdProfile(raw: any) {
+/* -----------------------------
+   Normalizers
+------------------------------*/
+
+function normalizeLetterboxdProfile(
+  raw: RawLetterboxdProfile
+): NormalizedProfile {
   return {
     username: raw.username ?? "",
     avatar_url: raw.avatar_url ?? "",
@@ -64,7 +138,9 @@ function normalizeLetterboxdProfile(raw: any) {
   };
 }
 
-function normalizeLetterboxdReview(raw: any) {
+function normalizeLetterboxdReview(
+  raw: RawLetterboxdReview
+): NormalizedPost {
   return {
     platform: "letterboxd",
     post_id: raw.id,

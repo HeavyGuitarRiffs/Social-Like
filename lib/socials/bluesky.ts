@@ -1,7 +1,18 @@
 // lib/socials/bluesky.ts
 
-export async function syncBluesky(account: any, supabase: any) {
-  const { access_token, user_id, did } = account;
+import type { Account } from "./socialIndex";                 // <-- UNIVERSAL TYPE
+import type { SupabaseClient } from "@supabase/supabase-js";
+import type { Database } from "@/supabase/types";
+
+export async function syncBluesky(
+  account: Account,                                           // <-- FIXED
+  supabase: SupabaseClient<Database>                          // <-- FIXED
+) {
+  const { access_token, user_id, did } = account as unknown as {
+    access_token: string;
+    user_id: string;
+    did: string;
+  };
 
   if (!access_token || !did) {
     return {
@@ -11,7 +22,10 @@ export async function syncBluesky(account: any, supabase: any) {
     };
   }
 
-  const refreshed = await refreshBlueskyTokenIfNeeded(account, supabase);
+  const refreshed = await refreshBlueskyTokenIfNeeded(
+    account as unknown as BlueskyAccount,                     // <-- Bluesky-specific fields
+    supabase
+  );
 
   const profile = await fetchBlueskyProfile(refreshed.access_token, did);
   const posts = await fetchBlueskyPosts(refreshed.access_token, did);
@@ -30,7 +44,12 @@ export async function syncBluesky(account: any, supabase: any) {
   });
 
   if (normalizedPosts.length > 0) {
-    await supabase.from("social_posts").upsert(normalizedPosts);
+    await supabase.from("social_posts").upsert(
+      normalizedPosts.map((p) => ({
+        ...p,
+        user_id,
+      }))
+    );
   }
 
   return {
@@ -41,13 +60,66 @@ export async function syncBluesky(account: any, supabase: any) {
   };
 }
 
-/* Helpers */
+/* -----------------------------
+   Local Types
+------------------------------*/
 
-async function refreshBlueskyTokenIfNeeded(account: any, supabase: any) {
-  return account;
+type BlueskyAccount = {
+  access_token: string;
+  user_id: string;
+  did: string;
+};
+
+type RawBlueskyProfile = {
+  handle?: string;
+  avatar?: string;
+  followersCount?: number;
+  followsCount?: number;
+};
+
+type RawBlueskyPost = {
+  uri: string;
+  text?: string;
+  embed?: {
+    images?: { fullsize?: string }[];
+  } | null;
+  likeCount?: number;
+  replyCount?: number;
+  createdAt?: string;
+};
+
+type NormalizedProfile = {
+  username: string;
+  avatar_url: string;
+  followers: number;
+  following: number;
+};
+
+type NormalizedPost = {
+  platform: string;
+  post_id: string;
+  caption: string;
+  media_url: string;
+  likes: number;
+  comments: number;
+  posted_at: string;
+};
+
+/* -----------------------------
+   Helpers
+------------------------------*/
+
+async function refreshBlueskyTokenIfNeeded(
+  account: BlueskyAccount,
+  supabase: SupabaseClient<Database>
+): Promise<BlueskyAccount> {
+  return account; // placeholder logic
 }
 
-async function fetchBlueskyProfile(accessToken: string, did: string) {
+async function fetchBlueskyProfile(
+  accessToken: string,
+  did: string
+): Promise<RawBlueskyProfile> {
   return {
     handle: "placeholder.bsky.social",
     avatar: "",
@@ -56,7 +128,10 @@ async function fetchBlueskyProfile(accessToken: string, did: string) {
   };
 }
 
-async function fetchBlueskyPosts(accessToken: string, did: string) {
+async function fetchBlueskyPosts(
+  accessToken: string,
+  did: string
+): Promise<RawBlueskyPost[]> {
   return [
     {
       uri: "1",
@@ -69,7 +144,9 @@ async function fetchBlueskyPosts(accessToken: string, did: string) {
   ];
 }
 
-function normalizeBlueskyProfile(raw: any) {
+function normalizeBlueskyProfile(
+  raw: RawBlueskyProfile
+): NormalizedProfile {
   return {
     username: raw.handle ?? "",
     avatar_url: raw.avatar ?? "",
@@ -78,7 +155,9 @@ function normalizeBlueskyProfile(raw: any) {
   };
 }
 
-function normalizeBlueskyPost(raw: any) {
+function normalizeBlueskyPost(
+  raw: RawBlueskyPost
+): NormalizedPost {
   return {
     platform: "bluesky",
     post_id: raw.uri,

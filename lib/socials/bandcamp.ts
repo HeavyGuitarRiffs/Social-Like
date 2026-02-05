@@ -1,10 +1,24 @@
 // lib/socials/bandcamp.ts
 
-export async function syncBandcamp(account: any, supabase: any) {
-  const { username, user_id } = account;
+import type { Account } from "./socialIndex";                 // <-- UNIVERSAL TYPE
+import type { SupabaseClient } from "@supabase/supabase-js";
+import type { Database } from "@/supabase/types";
+
+export async function syncBandcamp(
+  account: Account,                                           // <-- FIXED
+  supabase: SupabaseClient<Database>                          // <-- FIXED
+) {
+  const { username, user_id } = account as unknown as {        // <-- username-based auth
+    username: string;
+    user_id: string;
+  };
 
   if (!username) {
-    return { platform: "bandcamp", updated: false, error: "Missing username" };
+    return {
+      platform: "bandcamp",
+      updated: false,
+      error: "Missing username",
+    };
   }
 
   const profile = await fetchBandcampProfile(username);
@@ -24,15 +38,64 @@ export async function syncBandcamp(account: any, supabase: any) {
   });
 
   if (normalizedPosts.length > 0) {
-    await supabase.from("social_posts").upsert(normalizedPosts);
+    await supabase.from("social_posts").upsert(
+      normalizedPosts.map((p) => ({
+        ...p,
+        user_id,
+      }))
+    );
   }
 
-  return { platform: "bandcamp", updated: true, posts: normalizedPosts.length, metrics: true };
+  return {
+    platform: "bandcamp",
+    updated: true,
+    posts: normalizedPosts.length,
+    metrics: true,
+  };
 }
 
-/* Helpers */
+/* -----------------------------
+   Local Types
+------------------------------*/
 
-async function fetchBandcampProfile(username: string) {
+type RawBandcampProfile = {
+  username?: string;
+  image_url?: string;
+  followers?: number;
+};
+
+type RawBandcampPost = {
+  id: string;
+  title?: string;
+  image_url?: string;
+  plays?: number;
+  comments?: number;
+  released_at?: string;
+};
+
+type NormalizedProfile = {
+  username: string;
+  avatar_url: string;
+  followers: number;
+};
+
+type NormalizedPost = {
+  platform: string;
+  post_id: string;
+  caption: string;
+  media_url: string;
+  likes: number;
+  comments: number;
+  posted_at: string;
+};
+
+/* -----------------------------
+   Helpers
+------------------------------*/
+
+async function fetchBandcampProfile(
+  username: string
+): Promise<RawBandcampProfile> {
   return {
     username: "Placeholder Bandcamp Artist",
     image_url: "",
@@ -40,7 +103,9 @@ async function fetchBandcampProfile(username: string) {
   };
 }
 
-async function fetchBandcampReleases(username: string) {
+async function fetchBandcampReleases(
+  username: string
+): Promise<RawBandcampPost[]> {
   return [
     {
       id: "1",
@@ -53,7 +118,9 @@ async function fetchBandcampReleases(username: string) {
   ];
 }
 
-function normalizeBandcampProfile(raw: any) {
+function normalizeBandcampProfile(
+  raw: RawBandcampProfile
+): NormalizedProfile {
   return {
     username: raw.username ?? "",
     avatar_url: raw.image_url ?? "",
@@ -61,7 +128,9 @@ function normalizeBandcampProfile(raw: any) {
   };
 }
 
-function normalizeBandcampRelease(raw: any) {
+function normalizeBandcampRelease(
+  raw: RawBandcampPost
+): NormalizedPost {
   return {
     platform: "bandcamp",
     post_id: raw.id,

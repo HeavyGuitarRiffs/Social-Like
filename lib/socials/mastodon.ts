@@ -1,25 +1,62 @@
 // lib/socials/mastodon.ts
 
-export async function syncMastodon(account: any, supabase: any) {
-  const { access_token, user_id, instance_url } = account;
+import type { Account } from "./socialIndex";
+import type { SupabaseClient } from "@supabase/supabase-js";
+import type { Database } from "@/supabase/types";
+
+export async function syncMastodon(
+  account: Account,
+  supabase: SupabaseClient<Database>
+) {
+  const {
+    account_id,
+    user_id,
+    access_token,
+    refresh_token,
+    expires_at,
+    instance_url,
+  } = account as unknown as {
+    account_id: string;
+    user_id: string;
+    access_token: string;
+    refresh_token?: string;
+    expires_at?: number;
+    instance_url: string;
+  };
 
   if (!access_token || !instance_url) {
     return {
       platform: "mastodon",
       updated: false,
       error: "Missing access token or instance URL",
+      account_id,
     };
   }
 
-  const refreshed = await refreshMastodonTokenIfNeeded(account, supabase);
+  // Standardized token refresh pattern
+  const refreshed = await refreshMastodonTokenIfNeeded(
+    { account_id, user_id, access_token, refresh_token, expires_at, instance_url },
+    supabase
+  );
 
-  const profile = await fetchMastodonProfile(refreshed.access_token, instance_url);
-  const posts = await fetchMastodonStatuses(refreshed.access_token, instance_url);
+  const profile = await fetchMastodonProfile(
+    refreshed.access_token,
+    instance_url
+  );
+
+  const posts = await fetchMastodonStatuses(
+    refreshed.access_token,
+    instance_url
+  );
 
   const normalizedProfile = normalizeMastodonProfile(profile);
   const normalizedPosts = posts.map(normalizeMastodonStatus);
 
+  /* ---------------------------------
+     social_profiles
+  ----------------------------------*/
   await supabase.from("social_profiles").upsert({
+    account_id,
     user_id,
     platform: "mastodon",
     username: normalizedProfile.username,
@@ -29,8 +66,17 @@ export async function syncMastodon(account: any, supabase: any) {
     last_synced: new Date().toISOString(),
   });
 
+  /* ---------------------------------
+     social_posts
+  ----------------------------------*/
   if (normalizedPosts.length > 0) {
-    await supabase.from("social_posts").upsert(normalizedPosts);
+    await supabase.from("social_posts").upsert(
+      normalizedPosts.map((p) => ({
+        ...p,
+        user_id,
+        account_id,
+      }))
+    );
   }
 
   return {
@@ -38,16 +84,69 @@ export async function syncMastodon(account: any, supabase: any) {
     updated: true,
     posts: normalizedPosts.length,
     metrics: true,
+    account_id,
   };
 }
 
-/* Helpers */
+/* -----------------------------
+   Local Types
+------------------------------*/
 
-async function refreshMastodonTokenIfNeeded(account: any, supabase: any) {
-  return account;
+type RawMastodonProfile = {
+  username?: string;
+  avatar?: string;
+  followers_count?: number;
+  following_count?: number;
+};
+
+type RawMastodonStatus = {
+  id: string;
+  content?: string;
+  media_attachments?: Array<{ url?: string }>;
+  favourites_count?: number;
+  replies_count?: number;
+  created_at?: string;
+};
+
+type NormalizedProfile = {
+  username: string;
+  avatar_url: string;
+  followers: number;
+  following: number;
+};
+
+type NormalizedPost = {
+  platform: string;
+  post_id: string;
+  caption: string;
+  media_url: string;
+  likes: number;
+  comments: number;
+  posted_at: string;
+};
+
+/* -----------------------------
+   Helpers
+------------------------------*/
+
+async function refreshMastodonTokenIfNeeded(
+  account: {
+    account_id: string;
+    user_id: string;
+    access_token: string;
+    refresh_token?: string;
+    expires_at?: number;
+    instance_url: string;
+  },
+  supabase: SupabaseClient<Database>
+) {
+  return account; // placeholder logic
 }
 
-async function fetchMastodonProfile(accessToken: string, instance: string) {
+async function fetchMastodonProfile(
+  accessToken: string,
+  instance: string
+): Promise<RawMastodonProfile> {
   return {
     username: "placeholder",
     avatar: "",
@@ -56,7 +155,10 @@ async function fetchMastodonProfile(accessToken: string, instance: string) {
   };
 }
 
-async function fetchMastodonStatuses(accessToken: string, instance: string) {
+async function fetchMastodonStatuses(
+  accessToken: string,
+  instance: string
+): Promise<RawMastodonStatus[]> {
   return [
     {
       id: "1",
@@ -69,7 +171,9 @@ async function fetchMastodonStatuses(accessToken: string, instance: string) {
   ];
 }
 
-function normalizeMastodonProfile(raw: any) {
+function normalizeMastodonProfile(
+  raw: RawMastodonProfile
+): NormalizedProfile {
   return {
     username: raw.username ?? "",
     avatar_url: raw.avatar ?? "",
@@ -78,7 +182,9 @@ function normalizeMastodonProfile(raw: any) {
   };
 }
 
-function normalizeMastodonStatus(raw: any) {
+function normalizeMastodonStatus(
+  raw: RawMastodonStatus
+): NormalizedPost {
   return {
     platform: "mastodon",
     post_id: raw.id,

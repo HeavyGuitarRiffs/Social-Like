@@ -1,17 +1,48 @@
 // lib/socials/anchor.ts
 
-export async function syncAnchor(account: any, supabase: any) {
+import type { Account } from "./socialIndex";        // <-- UNIVERSAL TYPE
+import type { SupabaseClient } from "@supabase/supabase-js";
+import type { Database } from "@/supabase/types";
+import { attachUserId } from "./utils";
+
+type AnchorProfile = {
+  username: string;
+  avatar_url: string;
+  followers: number;
+};
+
+type AnchorEpisode = {
+  id: string;
+  title: string;
+  audio_url: string;
+  plays: number;
+  comments: number;
+  published_at: string;
+};
+
+export async function syncAnchor(
+  account: Account,                                   // <-- FIXED
+  supabase: SupabaseClient<Database>
+) {
   const { access_token, user_id } = account;
 
   if (!access_token) {
-    return { platform: "anchor", updated: false, error: "Missing access token" };
+    return {
+      platform: "anchor",
+      updated: false,
+      error: "Missing access token"
+    };
   }
 
   const profile = await fetchAnchorProfile(access_token);
   const posts = await fetchAnchorEpisodes(access_token);
 
   const normalizedProfile = normalizeAnchorProfile(profile);
-  const normalizedPosts = posts.map(normalizeAnchorEpisode);
+
+  const normalizedPosts = attachUserId(
+    posts.map(normalizeAnchorEpisode),
+    user_id
+  );
 
   await supabase.from("social_profiles").upsert({
     user_id,
@@ -27,12 +58,17 @@ export async function syncAnchor(account: any, supabase: any) {
     await supabase.from("social_posts").upsert(normalizedPosts);
   }
 
-  return { platform: "anchor", updated: true, posts: normalizedPosts.length, metrics: true };
+  return {
+    platform: "anchor",
+    updated: true,
+    posts: normalizedPosts.length,
+    metrics: true
+  };
 }
 
 /* Helpers */
 
-async function fetchAnchorProfile(accessToken: string) {
+async function fetchAnchorProfile(accessToken: string): Promise<AnchorProfile> {
   return {
     username: "Placeholder Anchor Podcaster",
     avatar_url: "",
@@ -40,7 +76,9 @@ async function fetchAnchorProfile(accessToken: string) {
   };
 }
 
-async function fetchAnchorEpisodes(accessToken: string) {
+async function fetchAnchorEpisodes(
+  accessToken: string
+): Promise<AnchorEpisode[]> {
   return [
     {
       id: "1",
@@ -53,7 +91,7 @@ async function fetchAnchorEpisodes(accessToken: string) {
   ];
 }
 
-function normalizeAnchorProfile(raw: any) {
+function normalizeAnchorProfile(raw: AnchorProfile) {
   return {
     username: raw.username ?? "",
     avatar_url: raw.avatar_url ?? "",
@@ -61,7 +99,7 @@ function normalizeAnchorProfile(raw: any) {
   };
 }
 
-function normalizeAnchorEpisode(raw: any) {
+function normalizeAnchorEpisode(raw: AnchorEpisode) {
   return {
     platform: "anchor",
     post_id: raw.id,

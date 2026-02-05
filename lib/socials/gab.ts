@@ -1,7 +1,17 @@
 // lib/socials/gab.ts
 
-export async function syncGab(account: any, supabase: any) {
-  const { access_token, user_id } = account;
+import type { Account } from "./socialIndex";
+import type { SupabaseClient } from "@supabase/supabase-js";
+import type { Database } from "@/supabase/types";
+
+export async function syncGab(
+  account: Account,
+  supabase: SupabaseClient<Database>
+) {
+  const { access_token, user_id } = account as unknown as {
+    access_token: string;
+    user_id: string;
+  };
 
   if (!access_token) {
     return {
@@ -11,7 +21,10 @@ export async function syncGab(account: any, supabase: any) {
     };
   }
 
-  const refreshed = await refreshGabTokenIfNeeded(account, supabase);
+  const refreshed = await refreshGabTokenIfNeeded(
+    account as unknown as GabAccount,
+    supabase
+  );
 
   const profile = await fetchGabProfile(refreshed.access_token);
   const posts = await fetchGabPosts(refreshed.access_token);
@@ -30,7 +43,12 @@ export async function syncGab(account: any, supabase: any) {
   });
 
   if (normalizedPosts.length > 0) {
-    await supabase.from("social_posts").upsert(normalizedPosts);
+    await supabase.from("social_posts").upsert(
+      normalizedPosts.map((p) => ({
+        ...p,
+        user_id,
+      }))
+    );
   }
 
   return {
@@ -41,13 +59,62 @@ export async function syncGab(account: any, supabase: any) {
   };
 }
 
-/* Helpers */
+/* -----------------------------
+   Local Types
+------------------------------*/
 
-async function refreshGabTokenIfNeeded(account: any, supabase: any) {
-  return account;
+type GabAccount = {
+  access_token: string;
+  user_id: string;
+};
+
+type RawGabProfile = {
+  username?: string;
+  avatar_url?: string;
+  followers_count?: number;
+  following_count?: number;
+};
+
+type RawGabPost = {
+  id: string;
+  body?: string;
+  media_url?: string;
+  like_count?: number;
+  reply_count?: number;
+  created_at?: string;
+};
+
+type NormalizedProfile = {
+  username: string;
+  avatar_url: string;
+  followers: number;
+  following: number;
+};
+
+type NormalizedPost = {
+  platform: string;
+  post_id: string;
+  caption: string;
+  media_url: string;
+  likes: number;
+  comments: number;
+  posted_at: string;
+};
+
+/* -----------------------------
+   Helpers
+------------------------------*/
+
+async function refreshGabTokenIfNeeded(
+  account: GabAccount,
+  supabase: SupabaseClient<Database>
+): Promise<GabAccount> {
+  return account; // placeholder logic
 }
 
-async function fetchGabProfile(accessToken: string) {
+async function fetchGabProfile(
+  accessToken: string
+): Promise<RawGabProfile> {
   return {
     username: "Placeholder Gab User",
     avatar_url: "",
@@ -56,7 +123,9 @@ async function fetchGabProfile(accessToken: string) {
   };
 }
 
-async function fetchGabPosts(accessToken: string) {
+async function fetchGabPosts(
+  accessToken: string
+): Promise<RawGabPost[]> {
   return [
     {
       id: "1",
@@ -69,7 +138,13 @@ async function fetchGabPosts(accessToken: string) {
   ];
 }
 
-function normalizeGabProfile(raw: any) {
+/* -----------------------------
+   Normalizers
+------------------------------*/
+
+function normalizeGabProfile(
+  raw: RawGabProfile
+): NormalizedProfile {
   return {
     username: raw.username ?? "",
     avatar_url: raw.avatar_url ?? "",
@@ -78,7 +153,9 @@ function normalizeGabProfile(raw: any) {
   };
 }
 
-function normalizeGabPost(raw: any) {
+function normalizeGabPost(
+  raw: RawGabPost
+): NormalizedPost {
   return {
     platform: "gab",
     post_id: raw.id,

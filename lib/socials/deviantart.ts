@@ -1,10 +1,21 @@
 // lib/socials/deviantart.ts
 
-export async function syncDeviantArt(account: any, supabase: any) {
+import type { Account } from "./socialIndex";                 // <-- UNIVERSAL TYPE
+import type { SupabaseClient } from "@supabase/supabase-js";
+import type { Database } from "@/supabase/types";
+
+export async function syncDeviantArt(
+  account: Account,                                           // <-- FIXED
+  supabase: SupabaseClient<Database>                          // <-- FIXED
+) {
   const { access_token, user_id } = account;
 
   if (!access_token) {
-    return { platform: "deviantart", updated: false, error: "Missing access token" };
+    return {
+      platform: "deviantart",
+      updated: false,
+      error: "Missing access token",
+    };
   }
 
   const profile = await fetchDeviantArtProfile(access_token);
@@ -24,15 +35,65 @@ export async function syncDeviantArt(account: any, supabase: any) {
   });
 
   if (normalizedPosts.length > 0) {
-    await supabase.from("social_posts").upsert(normalizedPosts);
+    await supabase.from("social_posts").upsert(
+      normalizedPosts.map((p) => ({
+        ...p,
+        user_id,
+      }))
+    );
   }
 
-  return { platform: "deviantart", updated: true, posts: normalizedPosts.length, metrics: true };
+  return {
+    platform: "deviantart",
+    updated: true,
+    posts: normalizedPosts.length,
+    metrics: true,
+  };
 }
 
-/* Helpers */
+/* -----------------------------
+   Local Types
+------------------------------*/
 
-async function fetchDeviantArtProfile(accessToken: string) {
+type RawDeviantArtProfile = {
+  username?: string;
+  usericon?: string;
+  watchers?: number;
+  watching?: number;
+};
+
+type RawDeviantArtPost = {
+  id: string;
+  title?: string;
+  preview?: { src?: string };
+  stats?: { favourites?: number; comments?: number };
+  published_time?: string;
+};
+
+type NormalizedProfile = {
+  username: string;
+  avatar_url: string;
+  followers: number;
+  following: number;
+};
+
+type NormalizedPost = {
+  platform: string;
+  post_id: string;
+  caption: string;
+  media_url: string;
+  likes: number;
+  comments: number;
+  posted_at: string;
+};
+
+/* -----------------------------
+   Helpers
+------------------------------*/
+
+async function fetchDeviantArtProfile(
+  accessToken: string
+): Promise<RawDeviantArtProfile> {
   return {
     username: "Placeholder DeviantArt User",
     usericon: "",
@@ -41,7 +102,9 @@ async function fetchDeviantArtProfile(accessToken: string) {
   };
 }
 
-async function fetchDeviantArtDeviations(accessToken: string) {
+async function fetchDeviantArtDeviations(
+  accessToken: string
+): Promise<RawDeviantArtPost[]> {
   return [
     {
       id: "1",
@@ -53,7 +116,9 @@ async function fetchDeviantArtDeviations(accessToken: string) {
   ];
 }
 
-function normalizeDeviantArtProfile(raw: any) {
+function normalizeDeviantArtProfile(
+  raw: RawDeviantArtProfile
+): NormalizedProfile {
   return {
     username: raw.username ?? "",
     avatar_url: raw.usericon ?? "",
@@ -62,7 +127,9 @@ function normalizeDeviantArtProfile(raw: any) {
   };
 }
 
-function normalizeDeviantArtDeviation(raw: any) {
+function normalizeDeviantArtDeviation(
+  raw: RawDeviantArtPost
+): NormalizedPost {
   return {
     platform: "deviantart",
     post_id: raw.id,

@@ -1,10 +1,24 @@
 // lib/socials/castbox.ts
 
-export async function syncCastbox(account: any, supabase: any) {
-  const { username, user_id } = account;
+import type { Account } from "./socialIndex";                 // <-- UNIVERSAL TYPE
+import type { SupabaseClient } from "@supabase/supabase-js";
+import type { Database } from "@/supabase/types";
+
+export async function syncCastbox(
+  account: Account,                                           // <-- FIXED
+  supabase: SupabaseClient<Database>                          // <-- FIXED
+) {
+  const { username, user_id } = account as unknown as {        // <-- username-based auth
+    username: string;
+    user_id: string;
+  };
 
   if (!username) {
-    return { platform: "castbox", updated: false, error: "Missing username" };
+    return {
+      platform: "castbox",
+      updated: false,
+      error: "Missing username",
+    };
   }
 
   const profile = await fetchCastboxProfile(username);
@@ -20,27 +34,78 @@ export async function syncCastbox(account: any, supabase: any) {
     avatar_url: normalizedProfile.avatar_url,
     followers: normalizedProfile.followers,
     following: 0,
-    last_synced: new Date().toISOString()
+    last_synced: new Date().toISOString(),
   });
 
   if (normalizedPosts.length > 0) {
-    await supabase.from("social_posts").upsert(normalizedPosts);
+    await supabase.from("social_posts").upsert(
+      normalizedPosts.map((p) => ({
+        ...p,
+        user_id,
+      }))
+    );
   }
 
-  return { platform: "castbox", updated: true, posts: normalizedPosts.length, metrics: true };
-}
-
-/* Helpers */
-
-async function fetchCastboxProfile(username: string) {
   return {
-    username: "Placeholder Castbox Podcaster",
-    avatar_url: "",
-    followers: 0
+    platform: "castbox",
+    updated: true,
+    posts: normalizedPosts.length,
+    metrics: true,
   };
 }
 
-async function fetchCastboxEpisodes(username: string) {
+/* -----------------------------
+   Local Types
+------------------------------*/
+
+type RawCastboxProfile = {
+  username?: string;
+  avatar_url?: string;
+  followers?: number;
+};
+
+type RawCastboxPost = {
+  id: string;
+  title?: string;
+  audio_url?: string;
+  plays?: number;
+  comments?: number;
+  created_at?: string;
+};
+
+type NormalizedProfile = {
+  username: string;
+  avatar_url: string;
+  followers: number;
+};
+
+type NormalizedPost = {
+  platform: string;
+  post_id: string;
+  caption: string;
+  media_url: string;
+  likes: number;
+  comments: number;
+  posted_at: string;
+};
+
+/* -----------------------------
+   Helpers
+------------------------------*/
+
+async function fetchCastboxProfile(
+  username: string
+): Promise<RawCastboxProfile> {
+  return {
+    username: "Placeholder Castbox Podcaster",
+    avatar_url: "",
+    followers: 0,
+  };
+}
+
+async function fetchCastboxEpisodes(
+  username: string
+): Promise<RawCastboxPost[]> {
   return [
     {
       id: "1",
@@ -48,20 +113,24 @@ async function fetchCastboxEpisodes(username: string) {
       audio_url: "",
       plays: 0,
       comments: 0,
-      created_at: new Date().toISOString()
-    }
+      created_at: new Date().toISOString(),
+    },
   ];
 }
 
-function normalizeCastboxProfile(raw: any) {
+function normalizeCastboxProfile(
+  raw: RawCastboxProfile
+): NormalizedProfile {
   return {
     username: raw.username ?? "",
     avatar_url: raw.avatar_url ?? "",
-    followers: raw.followers ?? 0
+    followers: raw.followers ?? 0,
   };
 }
 
-function normalizeCastboxEpisode(raw: any) {
+function normalizeCastboxEpisode(
+  raw: RawCastboxPost
+): NormalizedPost {
   return {
     platform: "castbox",
     post_id: raw.id,
@@ -69,6 +138,6 @@ function normalizeCastboxEpisode(raw: any) {
     media_url: raw.audio_url ?? "",
     likes: raw.plays ?? 0,
     comments: raw.comments ?? 0,
-    posted_at: raw.created_at ?? new Date().toISOString()
+    posted_at: raw.created_at ?? new Date().toISOString(),
   };
 }

@@ -1,6 +1,13 @@
 // lib/socials/behance.ts
 
-export async function syncBehance(account: any, supabase: any) {
+import type { Account } from "./socialIndex";                 // <-- UNIVERSAL TYPE
+import type { SupabaseClient } from "@supabase/supabase-js";
+import type { Database } from "@/supabase/types";
+
+export async function syncBehance(
+  account: Account,                                           // <-- FIXED
+  supabase: SupabaseClient<Database>                          // <-- FIXED
+) {
   const { access_token, user_id } = account;
 
   if (!access_token) {
@@ -11,7 +18,10 @@ export async function syncBehance(account: any, supabase: any) {
     };
   }
 
-  const refreshed = await refreshBehanceTokenIfNeeded(account, supabase);
+  const refreshed = await refreshBehanceTokenIfNeeded(
+    account as unknown as BehanceAccount,                     // <-- Behance-specific fields
+    supabase
+  );
 
   const profile = await fetchBehanceProfile(refreshed.access_token);
   const posts = await fetchBehanceProjects(refreshed.access_token);
@@ -30,7 +40,12 @@ export async function syncBehance(account: any, supabase: any) {
   });
 
   if (normalizedPosts.length > 0) {
-    await supabase.from("social_posts").upsert(normalizedPosts);
+    await supabase.from("social_posts").upsert(
+      normalizedPosts.map((p) => ({
+        ...p,
+        user_id,
+      }))
+    );
   }
 
   return {
@@ -41,13 +56,59 @@ export async function syncBehance(account: any, supabase: any) {
   };
 }
 
-/* Helpers */
+/* -----------------------------
+   Local Types
+------------------------------*/
 
-async function refreshBehanceTokenIfNeeded(account: any, supabase: any) {
-  return account;
+type BehanceAccount = {
+  access_token: string;
+  user_id: string;
+};
+
+type RawBehanceProfile = {
+  display_name?: string;
+  images?: Record<number, string>;
+  stats?: { followers?: number };
+};
+
+type RawBehanceProject = {
+  id: string;
+  name?: string;
+  covers?: { original?: string };
+  stats?: { appreciations?: number; comments?: number };
+  published_on?: number;
+};
+
+type NormalizedProfile = {
+  username: string;
+  avatar_url: string;
+  followers: number;
+};
+
+type NormalizedPost = {
+  platform: string;
+  post_id: string;
+  caption: string;
+  media_url: string;
+  likes: number;
+  comments: number;
+  posted_at: string;
+};
+
+/* -----------------------------
+   Helpers
+------------------------------*/
+
+async function refreshBehanceTokenIfNeeded(
+  account: BehanceAccount,
+  supabase: SupabaseClient<Database>
+): Promise<BehanceAccount> {
+  return account; // placeholder logic
 }
 
-async function fetchBehanceProfile(accessToken: string) {
+async function fetchBehanceProfile(
+  accessToken: string
+): Promise<RawBehanceProfile> {
   return {
     display_name: "Placeholder Artist",
     images: { 138: "" },
@@ -55,7 +116,9 @@ async function fetchBehanceProfile(accessToken: string) {
   };
 }
 
-async function fetchBehanceProjects(accessToken: string) {
+async function fetchBehanceProjects(
+  accessToken: string
+): Promise<RawBehanceProject[]> {
   return [
     {
       id: "1",
@@ -67,7 +130,9 @@ async function fetchBehanceProjects(accessToken: string) {
   ];
 }
 
-function normalizeBehanceProfile(raw: any) {
+function normalizeBehanceProfile(
+  raw: RawBehanceProfile
+): NormalizedProfile {
   return {
     username: raw.display_name ?? "",
     avatar_url: raw.images?.[138] ?? "",
@@ -75,7 +140,9 @@ function normalizeBehanceProfile(raw: any) {
   };
 }
 
-function normalizeBehanceProject(raw: any) {
+function normalizeBehanceProject(
+  raw: RawBehanceProject
+): NormalizedPost {
   return {
     platform: "behance",
     post_id: raw.id,
@@ -83,6 +150,6 @@ function normalizeBehanceProject(raw: any) {
     media_url: raw.covers?.original ?? "",
     likes: raw.stats?.appreciations ?? 0,
     comments: raw.stats?.comments ?? 0,
-    posted_at: new Date(raw.published_on).toISOString(),
+    posted_at: new Date(raw.published_on ?? Date.now()).toISOString(),
   };
 }

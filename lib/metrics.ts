@@ -1,7 +1,9 @@
-import { createClient } from "@/lib/supabase/server";
+// lib/metrics.ts
+
+import { createSupabaseServerClient } from "@/lib/supabase/server-client";
 
 export async function getCommentsToday() {
-  const supabase = createClient(); // note: not `await` here, createClient is sync
+  const supabase = await createSupabaseServerClient();
 
   const { count, error } = await supabase
     .from("social_comments")

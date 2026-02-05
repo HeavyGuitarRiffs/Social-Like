@@ -1,3 +1,5 @@
+//supabase\functions\create-checkout-session\index.ts
+
 import Stripe from "npm:stripe@12.0.0";
 import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
 

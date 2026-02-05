@@ -1,10 +1,24 @@
 // lib/socials/fivehundredpx.ts
 
-export async function syncFiveHundredPx(account: any, supabase: any) {
-  const { access_token, user_id } = account;
+import type { Account } from "./socialIndex";
+import type { SupabaseClient } from "@supabase/supabase-js";
+import type { Database } from "@/supabase/types";
+
+export async function syncFiveHundredPx(
+  account: Account,
+  supabase: SupabaseClient<Database>
+) {
+  const { access_token, user_id } = account as unknown as {
+    access_token: string;
+    user_id: string;
+  };
 
   if (!access_token) {
-    return { platform: "500px", updated: false, error: "Missing access token" };
+    return {
+      platform: "500px",
+      updated: false,
+      error: "Missing access token",
+    };
   }
 
   const profile = await fetchFiveHundredPxProfile(access_token);
@@ -24,15 +38,66 @@ export async function syncFiveHundredPx(account: any, supabase: any) {
   });
 
   if (normalizedPosts.length > 0) {
-    await supabase.from("social_posts").upsert(normalizedPosts);
+    await supabase.from("social_posts").upsert(
+      normalizedPosts.map((p) => ({
+        ...p,
+        user_id,
+      }))
+    );
   }
 
-  return { platform: "500px", updated: true, posts: normalizedPosts.length, metrics: true };
+  return {
+    platform: "500px",
+    updated: true,
+    posts: normalizedPosts.length,
+    metrics: true,
+  };
 }
 
-/* Helpers */
+/* -----------------------------
+   Local Types
+------------------------------*/
 
-async function fetchFiveHundredPxProfile(accessToken: string) {
+type RawFiveHundredPxProfile = {
+  username?: string;
+  avatar_url?: string;
+  followers?: number;
+  following?: number;
+};
+
+type RawFiveHundredPxPhoto = {
+  id: string;
+  name?: string;
+  image_url?: string;
+  likes?: number;
+  comments?: number;
+  created_at?: string;
+};
+
+type NormalizedProfile = {
+  username: string;
+  avatar_url: string;
+  followers: number;
+  following: number;
+};
+
+type NormalizedPost = {
+  platform: string;
+  post_id: string;
+  caption: string;
+  media_url: string;
+  likes: number;
+  comments: number;
+  posted_at: string;
+};
+
+/* -----------------------------
+   Placeholder Fetchers
+------------------------------*/
+
+async function fetchFiveHundredPxProfile(
+  accessToken: string
+): Promise<RawFiveHundredPxProfile> {
   return {
     username: "Placeholder 500px Photographer",
     avatar_url: "",
@@ -41,7 +106,9 @@ async function fetchFiveHundredPxProfile(accessToken: string) {
   };
 }
 
-async function fetchFiveHundredPxPhotos(accessToken: string) {
+async function fetchFiveHundredPxPhotos(
+  accessToken: string
+): Promise<RawFiveHundredPxPhoto[]> {
   return [
     {
       id: "1",
@@ -54,7 +121,13 @@ async function fetchFiveHundredPxPhotos(accessToken: string) {
   ];
 }
 
-function normalizeFiveHundredPxProfile(raw: any) {
+/* -----------------------------
+   Normalizers
+------------------------------*/
+
+function normalizeFiveHundredPxProfile(
+  raw: RawFiveHundredPxProfile
+): NormalizedProfile {
   return {
     username: raw.username ?? "",
     avatar_url: raw.avatar_url ?? "",
@@ -63,7 +136,9 @@ function normalizeFiveHundredPxProfile(raw: any) {
   };
 }
 
-function normalizeFiveHundredPxPhoto(raw: any) {
+function normalizeFiveHundredPxPhoto(
+  raw: RawFiveHundredPxPhoto
+): NormalizedPost {
   return {
     platform: "500px",
     post_id: raw.id,

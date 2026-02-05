@@ -1,82 +1,157 @@
-// lib/socials/areyoudead.ts
+// lib/socials/douyin.ts
 
-export async function syncAreYouDead(account: { username: string; user_id: string }, supabase: any) {
-  const { username, user_id } = account;
+import type { Account } from "./socialIndex";                 // <-- UNIVERSAL TYPE
+import type { SupabaseClient } from "@supabase/supabase-js";
+import type { Database } from "@/supabase/types";
 
-  if (!username) return { platform: "areyoudead", updated: false, error: "Missing username" };
+export async function syncDouyin(
+  account: Account,                                           // <-- FIXED
+  supabase: SupabaseClient<Database>                          // <-- FIXED
+): Promise<SyncResult> {
+  const { username, user_id } = account as unknown as {        // <-- username-based auth
+    username: string;
+    user_id: string;
+  };
 
-  const profile = await fetchAYDProfile(username);
-  const posts = await fetchAYDPosts(username);
+  if (!username) {
+    return {
+      platform: "douyin",
+      updated: false,
+      error: "Missing username",
+    };
+  }
 
-  const normalizedProfile = normalizeAYDProfile(profile);
-  const normalizedPosts = posts.map(normalizeAYDPost);
+  const profile = await fetchDouyinProfile(username);
+  const posts = await fetchDouyinPosts(username);
+
+  const normalizedProfile = normalizeDouyinProfile(profile);
+  const normalizedPosts = posts.map(normalizeDouyinPost);
 
   await supabase.from("social_profiles").upsert({
     user_id,
-    platform: "areyoudead",
+    platform: "douyin",
     username: normalizedProfile.username,
     avatar_url: normalizedProfile.avatar_url,
     followers: normalizedProfile.followers,
-    following: 0,
+    following: normalizedProfile.following,
     last_synced: new Date().toISOString(),
   });
 
   if (normalizedPosts.length > 0) {
-    await supabase.from("social_posts").upsert(normalizedPosts);
+    await supabase.from("social_posts").upsert(
+      normalizedPosts.map((p) => ({
+        ...p,
+        user_id,
+      }))
+    );
   }
 
-  return { platform: "areyoudead", updated: true, posts: normalizedPosts.length, metrics: true };
-}
-
-/* Helpers */
-
-async function fetchAYDProfile(username: string) {
   return {
-    username,
-    image_url: "",
-    followers: Math.floor(Math.random() * 1000),
+    platform: "douyin",
+    updated: true,
+    posts: normalizedPosts.length,
+    metrics: true,
   };
 }
 
-async function fetchAYDPosts(username: string) {
-  return Array.from({ length: Math.floor(Math.random() * 3) }).map((_, i) => ({
+/* -----------------------------
+   Local Types
+------------------------------*/
+
+type RawDouyinProfile = {
+  nickname?: string;
+  avatar_url?: string;
+  followers?: number;
+  following?: number;
+};
+
+type RawDouyinPost = {
+  id: string;
+  desc?: string;
+  cover_url?: string;
+  likes?: number;
+  comments?: number;
+  created_at?: string;
+};
+
+type NormalizedProfile = {
+  username: string;
+  avatar_url: string;
+  followers: number;
+  following: number;
+};
+
+type NormalizedPost = {
+  platform: string;
+  post_id: string;
+  caption: string;
+  media_url: string;
+  likes: number;
+  comments: number;
+  posted_at: string;
+};
+
+type SyncResult = {
+  platform: string;
+  updated: boolean;
+  posts?: number;
+  metrics?: boolean;
+  error?: string;
+};
+
+/* -----------------------------
+   Placeholder Fetchers
+------------------------------*/
+
+async function fetchDouyinProfile(
+  username: string
+): Promise<RawDouyinProfile> {
+  return {
+    nickname: username,
+    avatar_url: "",
+    followers: Math.floor(Math.random() * 10000),
+    following: Math.floor(Math.random() * 500),
+  };
+}
+
+async function fetchDouyinPosts(
+  username: string
+): Promise<RawDouyinPost[]> {
+  return Array.from({ length: 3 }).map((_, i) => ({
     id: `${username}-${i}`,
-    title: `Are You Dead Post ${i + 1}`,
-    image_url: "",
-    likes: Math.floor(Math.random() * 50),
-    comments: Math.floor(Math.random() * 10),
-    posted_at: new Date().toISOString(),
+    desc: `Douyin video ${i + 1}`,
+    cover_url: "",
+    likes: Math.floor(Math.random() * 500),
+    comments: Math.floor(Math.random() * 50),
+    created_at: new Date().toISOString(),
   }));
 }
 
-function normalizeAYDProfile(raw: any) {
+/* -----------------------------
+   Normalizers
+------------------------------*/
+
+function normalizeDouyinProfile(
+  raw: RawDouyinProfile
+): NormalizedProfile {
   return {
-    username: raw.username ?? "",
-    avatar_url: raw.image_url ?? "",
+    username: raw.nickname ?? "",
+    avatar_url: raw.avatar_url ?? "",
     followers: raw.followers ?? 0,
+    following: raw.following ?? 0,
   };
 }
 
-function normalizeAYDPost(raw: any) {
+function normalizeDouyinPost(
+  raw: RawDouyinPost
+): NormalizedPost {
   return {
-    platform: "areyoudead",
+    platform: "douyin",
     post_id: raw.id,
-    caption: raw.title ?? "",
-    media_url: raw.image_url ?? "",
+    caption: raw.desc ?? "",
+    media_url: raw.cover_url ?? "",
     likes: raw.likes ?? 0,
     comments: raw.comments ?? 0,
-    posted_at: raw.posted_at ?? new Date().toISOString(),
+    posted_at: raw.created_at ?? new Date().toISOString(),
   };
-}
-import { Account, SyncResult } from "./socialIndex";
-
-export async function syncDouyin(account: Account, supabase: any): Promise<SyncResult> {
-  // Placeholder logic
-  if (!account.username) {
-    return { platform: "douyin", updated: false, error: "Missing username" };
-  }
-
-  // Here you could later fetch posts/comments from Douyin API
-  // For now, just return a dummy result
-  return { platform: "douyin", updated: true, posts: 0, metrics: true };
 }

@@ -1,17 +1,41 @@
 // lib/socials/medium.ts
 
-export async function syncMedium(account: any, supabase: any) {
-  const { access_token, user_id } = account;
+import type { Account } from "./socialIndex";
+import type { SupabaseClient } from "@supabase/supabase-js";
+import type { Database } from "@/supabase/types";
+
+export async function syncMedium(
+  account: Account,
+  supabase: SupabaseClient<Database>
+) {
+  const {
+    account_id,
+    user_id,
+    access_token,
+    refresh_token,
+    expires_at,
+  } = account as unknown as {
+    account_id: string;
+    user_id: string;
+    access_token: string;
+    refresh_token?: string;
+    expires_at?: number;
+  };
 
   if (!access_token) {
     return {
       platform: "medium",
       updated: false,
       error: "Missing access token",
+      account_id,
     };
   }
 
-  const refreshed = await refreshMediumTokenIfNeeded(account, supabase);
+  // Standardized token refresh pattern
+  const refreshed = await refreshMediumTokenIfNeeded(
+    { account_id, user_id, access_token, refresh_token, expires_at },
+    supabase
+  );
 
   const profile = await fetchMediumProfile(refreshed.access_token);
   const posts = await fetchMediumPosts(refreshed.access_token);
@@ -19,18 +43,31 @@ export async function syncMedium(account: any, supabase: any) {
   const normalizedProfile = normalizeMediumProfile(profile);
   const normalizedPosts = posts.map(normalizeMediumPost);
 
+  /* ---------------------------------
+     social_profiles
+  ----------------------------------*/
   await supabase.from("social_profiles").upsert({
+    account_id,
     user_id,
     platform: "medium",
     username: normalizedProfile.username,
     avatar_url: normalizedProfile.avatar_url,
     followers: normalizedProfile.followers,
-    following: 0,
+    following: 0, // Medium does not expose following count
     last_synced: new Date().toISOString(),
   });
 
+  /* ---------------------------------
+     social_posts
+  ----------------------------------*/
   if (normalizedPosts.length > 0) {
-    await supabase.from("social_posts").upsert(normalizedPosts);
+    await supabase.from("social_posts").upsert(
+      normalizedPosts.map((p) => ({
+        ...p,
+        user_id,
+        account_id,
+      }))
+    );
   }
 
   return {
@@ -38,16 +75,65 @@ export async function syncMedium(account: any, supabase: any) {
     updated: true,
     posts: normalizedPosts.length,
     metrics: true,
+    account_id,
   };
 }
 
-/* Helpers */
+/* -----------------------------
+   Local Types
+------------------------------*/
 
-async function refreshMediumTokenIfNeeded(account: any, supabase: any) {
-  return account;
+type RawMediumProfile = {
+  name?: string;
+  image_url?: string;
+  followers?: number;
+};
+
+type RawMediumPost = {
+  id: string;
+  title?: string;
+  image_url?: string;
+  clap_count?: number;
+  comment_count?: number;
+  published_at?: string;
+};
+
+type NormalizedProfile = {
+  username: string;
+  avatar_url: string;
+  followers: number;
+};
+
+type NormalizedPost = {
+  platform: string;
+  post_id: string;
+  caption: string;
+  media_url: string;
+  likes: number;
+  comments: number;
+  posted_at: string;
+};
+
+/* -----------------------------
+   Helpers
+------------------------------*/
+
+async function refreshMediumTokenIfNeeded(
+  account: {
+    account_id: string;
+    user_id: string;
+    access_token: string;
+    refresh_token?: string;
+    expires_at?: number;
+  },
+  supabase: SupabaseClient<Database>
+) {
+  return account; // placeholder logic
 }
 
-async function fetchMediumProfile(accessToken: string) {
+async function fetchMediumProfile(
+  accessToken: string
+): Promise<RawMediumProfile> {
   return {
     name: "Placeholder Author",
     image_url: "",
@@ -55,7 +141,9 @@ async function fetchMediumProfile(accessToken: string) {
   };
 }
 
-async function fetchMediumPosts(accessToken: string) {
+async function fetchMediumPosts(
+  accessToken: string
+): Promise<RawMediumPost[]> {
   return [
     {
       id: "1",
@@ -68,7 +156,9 @@ async function fetchMediumPosts(accessToken: string) {
   ];
 }
 
-function normalizeMediumProfile(raw: any) {
+function normalizeMediumProfile(
+  raw: RawMediumProfile
+): NormalizedProfile {
   return {
     username: raw.name ?? "",
     avatar_url: raw.image_url ?? "",
@@ -76,7 +166,7 @@ function normalizeMediumProfile(raw: any) {
   };
 }
 
-function normalizeMediumPost(raw: any) {
+function normalizeMediumPost(raw: RawMediumPost): NormalizedPost {
   return {
     platform: "medium",
     post_id: raw.id,

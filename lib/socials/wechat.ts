@@ -1,17 +1,36 @@
 // lib/socials/wechat.ts
 
-export async function syncWeChat(account: any, supabase: any) {
-  const { access_token, user_id } = account;
+import type { Account } from "./socialIndex";
+import type { SupabaseClient } from "@supabase/supabase-js";
+import type { Database } from "@/supabase/types";
+
+export async function syncWeChat(
+  account: Account,
+  supabase: SupabaseClient<Database>
+) {
+  const {
+    account_id,
+    user_id,
+    access_token,
+  } = account as unknown as {
+    account_id: string;
+    user_id: string;
+    access_token: string;
+  };
 
   if (!access_token) {
     return {
       platform: "wechat",
       updated: false,
       error: "Missing access token",
+      account_id,
     };
   }
 
-  const refreshed = await refreshWeChatTokenIfNeeded(account, supabase);
+  const refreshed = await refreshWeChatTokenIfNeeded(
+    { access_token, user_id, account_id },
+    supabase
+  );
 
   const profile = await fetchWeChatProfile(refreshed.access_token);
   const posts = await fetchWeChatMoments(refreshed.access_token);
@@ -19,7 +38,11 @@ export async function syncWeChat(account: any, supabase: any) {
   const normalizedProfile = normalizeWeChatProfile(profile);
   const normalizedPosts = posts.map(normalizeWeChatMoment);
 
+  /* ---------------------------------
+     social_profiles
+  ----------------------------------*/
   await supabase.from("social_profiles").upsert({
+    account_id,
     user_id,
     platform: "wechat",
     username: normalizedProfile.username,
@@ -29,8 +52,17 @@ export async function syncWeChat(account: any, supabase: any) {
     last_synced: new Date().toISOString(),
   });
 
+  /* ---------------------------------
+     social_posts
+  ----------------------------------*/
   if (normalizedPosts.length > 0) {
-    await supabase.from("social_posts").upsert(normalizedPosts);
+    await supabase.from("social_posts").upsert(
+      normalizedPosts.map((p) => ({
+        ...p,
+        user_id,
+        account_id,
+      }))
+    );
   }
 
   return {
@@ -38,16 +70,61 @@ export async function syncWeChat(account: any, supabase: any) {
     updated: true,
     posts: normalizedPosts.length,
     metrics: true,
+    account_id,
   };
 }
 
-/* Helpers */
+/* -----------------------------
+   Local Types
+------------------------------*/
 
-async function refreshWeChatTokenIfNeeded(account: any, supabase: any) {
-  return account;
+type RawWeChatProfile = {
+  nickname?: string;
+  headimgurl?: string;
+  followers?: number;
+  following?: number;
+};
+
+type RawWeChatMoment = {
+  id: string;
+  text?: string;
+  media_url?: string;
+  like_count?: number;
+  comment_count?: number;
+  created_at?: string;
+};
+
+type NormalizedProfile = {
+  username: string;
+  avatar_url: string;
+  followers: number;
+  following: number;
+};
+
+type NormalizedPost = {
+  platform: string;
+  post_id: string;
+  caption: string;
+  media_url: string;
+  likes: number;
+  comments: number;
+  posted_at: string;
+};
+
+/* -----------------------------
+   Helpers
+------------------------------*/
+
+async function refreshWeChatTokenIfNeeded(
+  account: { access_token: string; user_id: string; account_id: string },
+  supabase: SupabaseClient<Database>
+) {
+  return account; // placeholder
 }
 
-async function fetchWeChatProfile(accessToken: string) {
+async function fetchWeChatProfile(
+  accessToken: string
+): Promise<RawWeChatProfile> {
   return {
     nickname: "Placeholder WeChat User",
     headimgurl: "",
@@ -56,7 +133,9 @@ async function fetchWeChatProfile(accessToken: string) {
   };
 }
 
-async function fetchWeChatMoments(accessToken: string) {
+async function fetchWeChatMoments(
+  accessToken: string
+): Promise<RawWeChatMoment[]> {
   return [
     {
       id: "1",
@@ -69,7 +148,7 @@ async function fetchWeChatMoments(accessToken: string) {
   ];
 }
 
-function normalizeWeChatProfile(raw: any) {
+function normalizeWeChatProfile(raw: RawWeChatProfile): NormalizedProfile {
   return {
     username: raw.nickname ?? "",
     avatar_url: raw.headimgurl ?? "",
@@ -78,7 +157,7 @@ function normalizeWeChatProfile(raw: any) {
   };
 }
 
-function normalizeWeChatMoment(raw: any) {
+function normalizeWeChatMoment(raw: RawWeChatMoment): NormalizedPost {
   return {
     platform: "wechat",
     post_id: raw.id,

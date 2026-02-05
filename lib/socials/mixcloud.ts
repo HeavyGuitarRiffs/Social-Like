@@ -1,13 +1,41 @@
 // lib/socials/mixcloud.ts
 
-export async function syncMixcloud(account: any, supabase: any) {
-  const { access_token, user_id } = account;
+import type { Account } from "./socialIndex";
+import type { SupabaseClient } from "@supabase/supabase-js";
+import type { Database } from "@/supabase/types";
+
+export async function syncMixcloud(
+  account: Account,
+  supabase: SupabaseClient<Database>
+) {
+  const {
+    account_id,
+    user_id,
+    access_token,
+    refresh_token,
+    expires_at,
+  } = account as unknown as {
+    account_id: string;
+    user_id: string;
+    access_token: string;
+    refresh_token?: string;
+    expires_at?: number;
+  };
 
   if (!access_token) {
-    return { platform: "mixcloud", updated: false, error: "Missing access token" };
+    return {
+      platform: "mixcloud",
+      updated: false,
+      error: "Missing access token",
+      account_id,
+    };
   }
 
-  const refreshed = await refreshMixcloudTokenIfNeeded(account, supabase);
+  // Mixcloud does not support refresh tokens, but we keep the signature consistent
+  const refreshed = await refreshMixcloudTokenIfNeeded(
+    { account_id, user_id, access_token, refresh_token, expires_at },
+    supabase
+  );
 
   const profile = await fetchMixcloudProfile(refreshed.access_token);
   const posts = await fetchMixcloudShows(refreshed.access_token);
@@ -15,30 +43,97 @@ export async function syncMixcloud(account: any, supabase: any) {
   const normalizedProfile = normalizeMixcloudProfile(profile);
   const normalizedPosts = posts.map(normalizeMixcloudShow);
 
+  /* ---------------------------------
+     social_profiles
+  ----------------------------------*/
   await supabase.from("social_profiles").upsert({
+    account_id,
     user_id,
     platform: "mixcloud",
     username: normalizedProfile.username,
     avatar_url: normalizedProfile.avatar_url,
     followers: normalizedProfile.followers,
-    following: 0,
+    following: 0, // Mixcloud does not expose following count
     last_synced: new Date().toISOString(),
   });
 
+  /* ---------------------------------
+     social_posts
+  ----------------------------------*/
   if (normalizedPosts.length > 0) {
-    await supabase.from("social_posts").upsert(normalizedPosts);
+    await supabase.from("social_posts").upsert(
+      normalizedPosts.map((p) => ({
+        ...p,
+        user_id,
+        account_id,
+      }))
+    );
   }
 
-  return { platform: "mixcloud", updated: true, posts: normalizedPosts.length, metrics: true };
+  return {
+    platform: "mixcloud",
+    updated: true,
+    posts: normalizedPosts.length,
+    metrics: true,
+    account_id,
+  };
 }
 
-/* Helpers */
+/* -----------------------------
+   Local Types
+------------------------------*/
 
-async function refreshMixcloudTokenIfNeeded(account: any, supabase: any) {
-  return account;
+type RawMixcloudProfile = {
+  name?: string;
+  pictures?: { large?: string };
+  follower_count?: number;
+};
+
+type RawMixcloudShow = {
+  id: string;
+  name?: string;
+  pictures?: { large?: string };
+  plays?: number;
+  comments?: number;
+  created_time?: string;
+};
+
+type NormalizedProfile = {
+  username: string;
+  avatar_url: string;
+  followers: number;
+};
+
+type NormalizedPost = {
+  platform: string;
+  post_id: string;
+  caption: string;
+  media_url: string;
+  likes: number;
+  comments: number;
+  posted_at: string;
+};
+
+/* -----------------------------
+   Helpers
+------------------------------*/
+
+async function refreshMixcloudTokenIfNeeded(
+  account: {
+    account_id: string;
+    user_id: string;
+    access_token: string;
+    refresh_token?: string;
+    expires_at?: number;
+  },
+  supabase: SupabaseClient<Database>
+) {
+  return account; // placeholder logic
 }
 
-async function fetchMixcloudProfile(accessToken: string) {
+async function fetchMixcloudProfile(
+  accessToken: string
+): Promise<RawMixcloudProfile> {
   return {
     name: "Placeholder Mixcloud DJ",
     pictures: { large: "" },
@@ -46,7 +141,9 @@ async function fetchMixcloudProfile(accessToken: string) {
   };
 }
 
-async function fetchMixcloudShows(accessToken: string) {
+async function fetchMixcloudShows(
+  accessToken: string
+): Promise<RawMixcloudShow[]> {
   return [
     {
       id: "1",
@@ -59,7 +156,9 @@ async function fetchMixcloudShows(accessToken: string) {
   ];
 }
 
-function normalizeMixcloudProfile(raw: any) {
+function normalizeMixcloudProfile(
+  raw: RawMixcloudProfile
+): NormalizedProfile {
   return {
     username: raw.name ?? "",
     avatar_url: raw.pictures?.large ?? "",
@@ -67,7 +166,7 @@ function normalizeMixcloudProfile(raw: any) {
   };
 }
 
-function normalizeMixcloudShow(raw: any) {
+function normalizeMixcloudShow(raw: RawMixcloudShow): NormalizedPost {
   return {
     platform: "mixcloud",
     post_id: raw.id,

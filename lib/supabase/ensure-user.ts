@@ -1,5 +1,6 @@
+// lib/supabase/ensure-user.ts
+
 import { SupabaseClient } from "@supabase/supabase-js";
-import { createSupabaseServerClient } from "./server-client";
 
 export async function ensureUserRow(
   supabase: SupabaseClient,
@@ -11,7 +12,8 @@ export async function ensureUserRow(
     .eq("auth_id", user.id)
     .single();
 
-  if (!data && !error) {
+  // Insert only if the row does not exist
+  if (!data && error?.code === "PGRST116") {
     await supabase.from("users").insert({
       auth_id: user.id,
       email: user.email,

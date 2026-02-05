@@ -1,89 +1,164 @@
-// lib/socials/youtube.ts
+// lib/socials/facebook.ts
 
-export async function syncYouTube(account: any, supabase: any) {
-  const { access_token, refresh_token, user_id } = account;
+import type { Account } from "./socialIndex";
+import type { SupabaseClient } from "@supabase/supabase-js";
+import type { Database } from "@/supabase/types";
+
+export async function syncFacebook(
+  account: Account,
+  supabase: SupabaseClient<Database>
+) {
+  const { access_token, user_id } = account as unknown as {
+    access_token: string;
+    user_id: string;
+  };
 
   if (!access_token) {
     return {
-      platform: "youtube",
+      platform: "facebook",
       updated: false,
       error: "Missing access token",
     };
   }
 
-  const refreshed = await refreshYouTubeTokenIfNeeded(account, supabase);
+  const refreshed = await refreshFacebookTokenIfNeeded(
+    account as unknown as FacebookAccount,
+    supabase
+  );
 
-  const profile = await fetchYouTubeProfile(refreshed.access_token);
-  const posts = await fetchYouTubeVideos(refreshed.access_token);
+  const profile = await fetchFacebookProfile(refreshed.access_token);
+  const posts = await fetchFacebookPosts(refreshed.access_token);
 
-  const normalizedProfile = normalizeYouTubeProfile(profile);
-  const normalizedPosts = posts.map(normalizeYouTubeVideo);
+  const normalizedProfile = normalizeFacebookProfile(profile);
+  const normalizedPosts = posts.map(normalizeFacebookPost);
 
   await supabase.from("social_profiles").upsert({
     user_id,
-    platform: "youtube",
+    platform: "facebook",
     username: normalizedProfile.username,
     avatar_url: normalizedProfile.avatar_url,
-    followers: normalizedProfile.subscribers,
+    followers: normalizedProfile.followers,
     following: 0,
     last_synced: new Date().toISOString(),
   });
 
   if (normalizedPosts.length > 0) {
-    await supabase.from("social_posts").upsert(normalizedPosts);
+    await supabase.from("social_posts").upsert(
+      normalizedPosts.map((p) => ({
+        ...p,
+        user_id,
+      }))
+    );
   }
 
   return {
-    platform: "youtube",
+    platform: "facebook",
     updated: true,
     posts: normalizedPosts.length,
     metrics: true,
   };
 }
 
-/* Helper functions */
+/* -----------------------------
+   Local Types
+------------------------------*/
 
-async function refreshYouTubeTokenIfNeeded(account: any, supabase: any) {
-  return account;
+type FacebookAccount = {
+  access_token: string;
+  user_id: string;
+};
+
+type RawFacebookProfile = {
+  name?: string;
+  picture?: { data?: { url?: string } };
+  followers_count?: number;
+};
+
+type RawFacebookPost = {
+  id: string;
+  message?: string;
+  full_picture?: string;
+  likes?: number;
+  comments?: number;
+  created_time?: string;
+};
+
+type NormalizedProfile = {
+  username: string;
+  avatar_url: string;
+  followers: number;
+};
+
+type NormalizedPost = {
+  platform: string;
+  post_id: string;
+  caption: string;
+  media_url: string;
+  likes: number;
+  comments: number;
+  posted_at: string;
+};
+
+/* -----------------------------
+   Placeholder Fetchers
+------------------------------*/
+
+async function refreshFacebookTokenIfNeeded(
+  account: FacebookAccount,
+  supabase: SupabaseClient<Database>
+): Promise<FacebookAccount> {
+  return account; // placeholder logic
 }
 
-async function fetchYouTubeProfile(accessToken: string) {
+async function fetchFacebookProfile(
+  accessToken: string
+): Promise<RawFacebookProfile> {
   return {
-    title: "Placeholder Channel",
-    thumbnail: "",
-    subscriberCount: 0,
+    name: "Placeholder Facebook Page",
+    picture: { data: { url: "" } },
+    followers_count: 0,
   };
 }
 
-async function fetchYouTubeVideos(accessToken: string) {
+async function fetchFacebookPosts(
+  accessToken: string
+): Promise<RawFacebookPost[]> {
   return [
     {
       id: "1",
-      title: "Placeholder Video",
-      thumbnail: "",
-      likeCount: 0,
-      commentCount: 0,
-      publishedAt: new Date().toISOString(),
+      message: "Placeholder Facebook Post",
+      full_picture: "",
+      likes: 0,
+      comments: 0,
+      created_time: new Date().toISOString(),
     },
   ];
 }
 
-function normalizeYouTubeProfile(raw: any) {
+/* -----------------------------
+   Normalizers
+------------------------------*/
+
+function normalizeFacebookProfile(
+  raw: RawFacebookProfile
+): NormalizedProfile {
   return {
-    username: raw.title ?? "",
-    avatar_url: raw.thumbnail ?? "",
-    subscribers: raw.subscriberCount ?? 0,
+    username: raw.name ?? "",
+    avatar_url: raw.picture?.data?.url ?? "",
+    followers: raw.followers_count ?? 0,
   };
 }
 
-function normalizeYouTubeVideo(raw: any) {
+function normalizeFacebookPost(
+  raw: RawFacebookPost
+): NormalizedPost {
   return {
-    platform: "youtube",
+    platform: "facebook",
     post_id: raw.id,
-    caption: raw.title ?? "",
-    media_url: raw.thumbnail ?? "",
-    likes: raw.likeCount ?? 0,
-    comments: raw.commentCount ?? 0,
-    posted_at: raw.publishedAt ?? new Date().toISOString(),
+    caption: raw.message ?? "",
+    media_url: raw.full_picture ?? "",
+    likes: raw.likes ?? 0,
+    comments: raw.comments ?? 0,
+    posted_at: raw.created_time ?? new Date().toISOString(),
   };
 }

@@ -1,17 +1,41 @@
 // lib/socials/strava.ts
 
-export async function syncStrava(account: any, supabase: any) {
-  const { access_token, user_id } = account;
+import type { Account } from "./socialIndex";
+import type { SupabaseClient } from "@supabase/supabase-js";
+import type { Database } from "@/supabase/types";
+
+export async function syncStrava(
+  account: Account,
+  supabase: SupabaseClient<Database>
+) {
+  const {
+    account_id,
+    user_id,
+    access_token,
+    refresh_token,
+    expires_at,
+  } = account as unknown as {
+    account_id: string;
+    user_id: string;
+    access_token: string;
+    refresh_token?: string;
+    expires_at?: number;
+  };
 
   if (!access_token) {
     return {
       platform: "strava",
       updated: false,
       error: "Missing access token",
+      account_id,
     };
   }
 
-  const refreshed = await refreshStravaTokenIfNeeded(account, supabase);
+  // Strava refresh placeholder (kept consistent with universal pattern)
+  const refreshed = await refreshStravaTokenIfNeeded(
+    { account_id, user_id, access_token, refresh_token, expires_at },
+    supabase
+  );
 
   const profile = await fetchStravaProfile(refreshed.access_token);
   const posts = await fetchStravaActivities(refreshed.access_token);
@@ -19,7 +43,11 @@ export async function syncStrava(account: any, supabase: any) {
   const normalizedProfile = normalizeStravaProfile(profile);
   const normalizedPosts = posts.map(normalizeStravaActivity);
 
+  /* ---------------------------------
+     social_profiles
+  ----------------------------------*/
   await supabase.from("social_profiles").upsert({
+    account_id,
     user_id,
     platform: "strava",
     username: normalizedProfile.username,
@@ -29,8 +57,17 @@ export async function syncStrava(account: any, supabase: any) {
     last_synced: new Date().toISOString(),
   });
 
+  /* ---------------------------------
+     social_posts
+  ----------------------------------*/
   if (normalizedPosts.length > 0) {
-    await supabase.from("social_posts").upsert(normalizedPosts);
+    await supabase.from("social_posts").upsert(
+      normalizedPosts.map((p) => ({
+        ...p,
+        user_id,
+        account_id,
+      }))
+    );
   }
 
   return {
@@ -38,16 +75,66 @@ export async function syncStrava(account: any, supabase: any) {
     updated: true,
     posts: normalizedPosts.length,
     metrics: true,
+    account_id,
   };
 }
 
-/* Helpers */
+/* -----------------------------
+   Local Types
+------------------------------*/
 
-async function refreshStravaTokenIfNeeded(account: any, supabase: any) {
-  return account;
+type RawStravaProfile = {
+  username?: string;
+  profile?: string;
+  follower_count?: number;
+  friend_count?: number;
+};
+
+type RawStravaActivity = {
+  id: string;
+  name?: string;
+  distance?: number;
+  moving_time?: number;
+  start_date?: string;
+};
+
+type NormalizedProfile = {
+  username: string;
+  avatar_url: string;
+  followers: number;
+  following: number;
+};
+
+type NormalizedPost = {
+  platform: string;
+  post_id: string;
+  caption: string;
+  media_url: string;
+  likes: number;
+  comments: number;
+  posted_at: string;
+};
+
+/* -----------------------------
+   Helpers
+------------------------------*/
+
+async function refreshStravaTokenIfNeeded(
+  account: {
+    account_id: string;
+    user_id: string;
+    access_token: string;
+    refresh_token?: string;
+    expires_at?: number;
+  },
+  supabase: SupabaseClient<Database>
+) {
+  return account; // placeholder logic
 }
 
-async function fetchStravaProfile(accessToken: string) {
+async function fetchStravaProfile(
+  accessToken: string
+): Promise<RawStravaProfile> {
   return {
     username: "Placeholder Athlete",
     profile: "",
@@ -56,7 +143,9 @@ async function fetchStravaProfile(accessToken: string) {
   };
 }
 
-async function fetchStravaActivities(accessToken: string) {
+async function fetchStravaActivities(
+  accessToken: string
+): Promise<RawStravaActivity[]> {
   return [
     {
       id: "1",
@@ -68,7 +157,9 @@ async function fetchStravaActivities(accessToken: string) {
   ];
 }
 
-function normalizeStravaProfile(raw: any) {
+function normalizeStravaProfile(
+  raw: RawStravaProfile
+): NormalizedProfile {
   return {
     username: raw.username ?? "",
     avatar_url: raw.profile ?? "",
@@ -77,7 +168,9 @@ function normalizeStravaProfile(raw: any) {
   };
 }
 
-function normalizeStravaActivity(raw: any) {
+function normalizeStravaActivity(
+  raw: RawStravaActivity
+): NormalizedPost {
   return {
     platform: "strava",
     post_id: raw.id,

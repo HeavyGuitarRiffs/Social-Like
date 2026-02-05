@@ -1,17 +1,41 @@
 // lib/socials/pinterest.ts
 
-export async function syncPinterest(account: any, supabase: any) {
-  const { access_token, refresh_token, user_id } = account;
+import type { Account } from "./socialIndex";
+import type { SupabaseClient } from "@supabase/supabase-js";
+import type { Database } from "@/supabase/types";
+
+export async function syncPinterest(
+  account: Account,
+  supabase: SupabaseClient<Database>
+) {
+  const {
+    account_id,
+    user_id,
+    access_token,
+    refresh_token,
+    expires_at,
+  } = account as unknown as {
+    account_id: string;
+    user_id: string;
+    access_token: string;
+    refresh_token?: string;
+    expires_at?: number;
+  };
 
   if (!access_token) {
     return {
       platform: "pinterest",
       updated: false,
       error: "Missing access token",
+      account_id,
     };
   }
 
-  const refreshed = await refreshPinterestTokenIfNeeded(account, supabase);
+  // Pinterest refresh placeholder (kept consistent with universal pattern)
+  const refreshed = await refreshPinterestTokenIfNeeded(
+    { account_id, user_id, access_token, refresh_token, expires_at },
+    supabase
+  );
 
   const profile = await fetchPinterestProfile(refreshed.access_token);
   const posts = await fetchPinterestPins(refreshed.access_token);
@@ -19,7 +43,11 @@ export async function syncPinterest(account: any, supabase: any) {
   const normalizedProfile = normalizePinterestProfile(profile);
   const normalizedPosts = posts.map(normalizePinterestPin);
 
+  /* ---------------------------------
+     social_profiles
+  ----------------------------------*/
   await supabase.from("social_profiles").upsert({
+    account_id,
     user_id,
     platform: "pinterest",
     username: normalizedProfile.username,
@@ -29,8 +57,17 @@ export async function syncPinterest(account: any, supabase: any) {
     last_synced: new Date().toISOString(),
   });
 
+  /* ---------------------------------
+     social_posts
+  ----------------------------------*/
   if (normalizedPosts.length > 0) {
-    await supabase.from("social_posts").upsert(normalizedPosts);
+    await supabase.from("social_posts").upsert(
+      normalizedPosts.map((p) => ({
+        ...p,
+        user_id,
+        account_id,
+      }))
+    );
   }
 
   return {
@@ -38,16 +75,67 @@ export async function syncPinterest(account: any, supabase: any) {
     updated: true,
     posts: normalizedPosts.length,
     metrics: true,
+    account_id,
   };
 }
 
-/* Helper functions */
+/* -----------------------------
+   Local Types
+------------------------------*/
 
-async function refreshPinterestTokenIfNeeded(account: any, supabase: any) {
-  return account;
+type RawPinterestProfile = {
+  username?: string;
+  profile_image?: string;
+  follower_count?: number;
+  following_count?: number;
+};
+
+type RawPinterestPin = {
+  id: string;
+  title?: string;
+  image_url?: string;
+  save_count?: number;
+  comment_count?: number;
+  created_at?: string;
+};
+
+type NormalizedProfile = {
+  username: string;
+  avatar_url: string;
+  followers: number;
+  following: number;
+};
+
+type NormalizedPost = {
+  platform: string;
+  post_id: string;
+  caption: string;
+  media_url: string;
+  likes: number;
+  comments: number;
+  posted_at: string;
+};
+
+/* -----------------------------
+   Helpers
+------------------------------*/
+
+async function refreshPinterestTokenIfNeeded(
+  account: {
+    account_id: string;
+    user_id: string;
+    access_token: string;
+    refresh_token?: string;
+    expires_at?: number;
+  },
+  supabase: SupabaseClient<Database>
+) {
+  return account; // placeholder logic
 }
 
-async function fetchPinterestProfile(accessToken: string) {
+async function fetchPinterestProfile(
+  accessToken: string
+): Promise<RawPinterestProfile> {
   return {
     username: "placeholder",
     profile_image: "",
@@ -56,7 +144,9 @@ async function fetchPinterestProfile(accessToken: string) {
   };
 }
 
-async function fetchPinterestPins(accessToken: string) {
+async function fetchPinterestPins(
+  accessToken: string
+): Promise<RawPinterestPin[]> {
   return [
     {
       id: "1",
@@ -69,7 +159,9 @@ async function fetchPinterestPins(accessToken: string) {
   ];
 }
 
-function normalizePinterestProfile(raw: any) {
+function normalizePinterestProfile(
+  raw: RawPinterestProfile
+): NormalizedProfile {
   return {
     username: raw.username ?? "",
     avatar_url: raw.profile_image ?? "",
@@ -78,7 +170,9 @@ function normalizePinterestProfile(raw: any) {
   };
 }
 
-function normalizePinterestPin(raw: any) {
+function normalizePinterestPin(
+  raw: RawPinterestPin
+): NormalizedPost {
   return {
     platform: "pinterest",
     post_id: raw.id,

@@ -1,10 +1,17 @@
 // lib/socials/bitchute.ts
 
-export async function syncBitChute(account: any, supabase: any) {
+export async function syncBitChute(
+  account: BitChuteAccount,
+  supabase: SupabaseClientLike
+) {
   const { username, user_id } = account;
 
   if (!username) {
-    return { platform: "bitchute", updated: false, error: "Missing username" };
+    return {
+      platform: "bitchute",
+      updated: false,
+      error: "Missing username",
+    };
   }
 
   const profile = await fetchBitChuteProfile(username);
@@ -24,7 +31,12 @@ export async function syncBitChute(account: any, supabase: any) {
   });
 
   if (normalizedPosts.length > 0) {
-    await supabase.from("social_posts").upsert(normalizedPosts);
+    await supabase.from("social_posts").upsert(
+      normalizedPosts.map((p) => ({
+        ...p,
+        user_id,
+      }))
+    );
   }
 
   return {
@@ -35,10 +47,60 @@ export async function syncBitChute(account: any, supabase: any) {
   };
 }
 
-/* Helpers – stubbed, replace with real HTTP calls */
+/* -----------------------------
+   Local Types
+------------------------------*/
 
-async function fetchBitChuteProfile(username: string) {
-  // TODO: Implement actual BitChute scraping/API call
+type SupabaseClientLike = {
+  from: (table: string) => {
+    upsert: (values: unknown) => Promise<unknown>;
+  };
+};
+
+type BitChuteAccount = {
+  username: string;
+  user_id: string;
+};
+
+type RawBitChuteProfile = {
+  username?: string;
+  avatar_url?: string;
+  followers?: number;
+};
+
+type RawBitChutePost = {
+  id: string;
+  title?: string;
+  thumbnail_url?: string;
+  views?: number;
+  likes?: number;
+  comments?: number;
+  created_at?: string;
+};
+
+type NormalizedProfile = {
+  username: string;
+  avatar_url: string;
+  followers: number;
+};
+
+type NormalizedPost = {
+  platform: string;
+  post_id: string;
+  caption: string;
+  media_url: string;
+  likes: number;
+  comments: number;
+  posted_at: string;
+};
+
+/* -----------------------------
+   Helpers
+------------------------------*/
+
+async function fetchBitChuteProfile(
+  username: string
+): Promise<RawBitChuteProfile> {
   return {
     username: "Placeholder BitChute Creator",
     avatar_url: "",
@@ -46,8 +108,9 @@ async function fetchBitChuteProfile(username: string) {
   };
 }
 
-async function fetchBitChuteVideos(username: string) {
-  // TODO: Implement actual BitChute scraping/API call
+async function fetchBitChuteVideos(
+  username: string
+): Promise<RawBitChutePost[]> {
   return [
     {
       id: "1",
@@ -61,7 +124,9 @@ async function fetchBitChuteVideos(username: string) {
   ];
 }
 
-function normalizeBitChuteProfile(raw: any) {
+function normalizeBitChuteProfile(
+  raw: RawBitChuteProfile
+): NormalizedProfile {
   return {
     username: raw.username ?? "",
     avatar_url: raw.avatar_url ?? "",
@@ -69,7 +134,9 @@ function normalizeBitChuteProfile(raw: any) {
   };
 }
 
-function normalizeBitChuteVideo(raw: any) {
+function normalizeBitChuteVideo(
+  raw: RawBitChutePost
+): NormalizedPost {
   return {
     platform: "bitchute",
     post_id: raw.id,

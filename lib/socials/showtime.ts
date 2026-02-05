@@ -1,10 +1,30 @@
 // lib/socials/showtime.ts
 
-export async function syncShowtime(account: any, supabase: any) {
-  const { wallet_address, user_id } = account;
+import type { Account } from "./socialIndex";
+import type { SupabaseClient } from "@supabase/supabase-js";
+import type { Database } from "@/supabase/types";
+
+export async function syncShowtime(
+  account: Account,
+  supabase: SupabaseClient<Database>
+) {
+  const {
+    account_id,
+    user_id,
+    wallet_address,
+  } = account as unknown as {
+    account_id: string;
+    user_id: string;
+    wallet_address: string;
+  };
 
   if (!wallet_address) {
-    return { platform: "showtime", updated: false, error: "Missing wallet address" };
+    return {
+      platform: "showtime",
+      updated: false,
+      error: "Missing wallet address",
+      account_id,
+    };
   }
 
   const profile = await fetchShowtimeProfile(wallet_address);
@@ -13,26 +33,84 @@ export async function syncShowtime(account: any, supabase: any) {
   const normalizedProfile = normalizeShowtimeProfile(profile);
   const normalizedPosts = posts.map(normalizeShowtimeNFT);
 
+  /* ---------------------------------
+     social_profiles
+  ----------------------------------*/
   await supabase.from("social_profiles").upsert({
+    account_id,
     user_id,
     platform: "showtime",
     username: normalizedProfile.username,
     avatar_url: normalizedProfile.avatar_url,
     followers: normalizedProfile.followers,
-    following: 0,
+    following: 0, // Showtime does not expose following count
     last_synced: new Date().toISOString(),
   });
 
+  /* ---------------------------------
+     social_posts
+  ----------------------------------*/
   if (normalizedPosts.length > 0) {
-    await supabase.from("social_posts").upsert(normalizedPosts);
+    await supabase.from("social_posts").upsert(
+      normalizedPosts.map((p) => ({
+        ...p,
+        user_id,
+        account_id,
+      }))
+    );
   }
 
-  return { platform: "showtime", updated: true, posts: normalizedPosts.length, metrics: true };
+  return {
+    platform: "showtime",
+    updated: true,
+    posts: normalizedPosts.length,
+    metrics: true,
+    account_id,
+  };
 }
 
-/* Helpers */
+/* -----------------------------
+   Local Types
+------------------------------*/
 
-async function fetchShowtimeProfile(wallet: string) {
+type RawShowtimeProfile = {
+  username?: string;
+  avatar_url?: string;
+  followers?: number;
+};
+
+type RawShowtimeNFT = {
+  id: string;
+  name?: string;
+  image_url?: string;
+  likes?: number;
+  comments?: number;
+  created_at?: string;
+};
+
+type NormalizedProfile = {
+  username: string;
+  avatar_url: string;
+  followers: number;
+};
+
+type NormalizedPost = {
+  platform: string;
+  post_id: string;
+  caption: string;
+  media_url: string;
+  likes: number;
+  comments: number;
+  posted_at: string;
+};
+
+/* -----------------------------
+   Helpers
+------------------------------*/
+
+async function fetchShowtimeProfile(
+  wallet: string
+): Promise<RawShowtimeProfile> {
   return {
     username: "Placeholder Showtime Creator",
     avatar_url: "",
@@ -40,7 +118,9 @@ async function fetchShowtimeProfile(wallet: string) {
   };
 }
 
-async function fetchShowtimeNFTs(wallet: string) {
+async function fetchShowtimeNFTs(
+  wallet: string
+): Promise<RawShowtimeNFT[]> {
   return [
     {
       id: "1",
@@ -53,7 +133,9 @@ async function fetchShowtimeNFTs(wallet: string) {
   ];
 }
 
-function normalizeShowtimeProfile(raw: any) {
+function normalizeShowtimeProfile(
+  raw: RawShowtimeProfile
+): NormalizedProfile {
   return {
     username: raw.username ?? "",
     avatar_url: raw.avatar_url ?? "",
@@ -61,7 +143,9 @@ function normalizeShowtimeProfile(raw: any) {
   };
 }
 
-function normalizeShowtimeNFT(raw: any) {
+function normalizeShowtimeNFT(
+  raw: RawShowtimeNFT
+): NormalizedPost {
   return {
     platform: "showtime",
     post_id: raw.id,

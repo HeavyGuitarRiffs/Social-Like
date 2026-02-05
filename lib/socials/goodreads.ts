@@ -1,10 +1,24 @@
 // lib/socials/goodreads.ts
 
-export async function syncGoodreads(account: any, supabase: any) {
-  const { username, user_id } = account;
+import type { Account } from "./socialIndex";
+import type { SupabaseClient } from "@supabase/supabase-js";
+import type { Database } from "@/supabase/types";
+
+export async function syncGoodreads(
+  account: Account,
+  supabase: SupabaseClient<Database>
+) {
+  const { username, user_id } = account as unknown as {
+    username: string;
+    user_id: string;
+  };
 
   if (!username) {
-    return { platform: "goodreads", updated: false, error: "Missing username" };
+    return {
+      platform: "goodreads",
+      updated: false,
+      error: "Missing username",
+    };
   }
 
   const profile = await fetchGoodreadsProfile(username);
@@ -24,15 +38,67 @@ export async function syncGoodreads(account: any, supabase: any) {
   });
 
   if (normalizedPosts.length > 0) {
-    await supabase.from("social_posts").upsert(normalizedPosts);
+    await supabase.from("social_posts").upsert(
+      normalizedPosts.map((p) => ({
+        ...p,
+        user_id,
+      }))
+    );
   }
 
-  return { platform: "goodreads", updated: true, posts: normalizedPosts.length, metrics: true };
+  return {
+    platform: "goodreads",
+    updated: true,
+    posts: normalizedPosts.length,
+    metrics: true,
+  };
 }
 
-/* Helpers */
+/* -----------------------------
+   Local Types
+------------------------------*/
 
-async function fetchGoodreadsProfile(username: string) {
+type RawGoodreadsProfile = {
+  username?: string;
+  avatar_url?: string;
+  followers?: number;
+  following?: number;
+};
+
+type RawGoodreadsReview = {
+  id: string;
+  book?: string;
+  review?: string;
+  rating?: number;
+  likes?: number;
+  comments?: number;
+  created_at?: string;
+};
+
+type NormalizedProfile = {
+  username: string;
+  avatar_url: string;
+  followers: number;
+  following: number;
+};
+
+type NormalizedPost = {
+  platform: string;
+  post_id: string;
+  caption: string;
+  media_url: string;
+  likes: number;
+  comments: number;
+  posted_at: string;
+};
+
+/* -----------------------------
+   Placeholder Fetchers
+------------------------------*/
+
+async function fetchGoodreadsProfile(
+  username: string
+): Promise<RawGoodreadsProfile> {
   return {
     username: "Placeholder Goodreads User",
     avatar_url: "",
@@ -41,7 +107,9 @@ async function fetchGoodreadsProfile(username: string) {
   };
 }
 
-async function fetchGoodreadsReviews(username: string) {
+async function fetchGoodreadsReviews(
+  username: string
+): Promise<RawGoodreadsReview[]> {
   return [
     {
       id: "1",
@@ -55,7 +123,13 @@ async function fetchGoodreadsReviews(username: string) {
   ];
 }
 
-function normalizeGoodreadsProfile(raw: any) {
+/* -----------------------------
+   Normalizers
+------------------------------*/
+
+function normalizeGoodreadsProfile(
+  raw: RawGoodreadsProfile
+): NormalizedProfile {
   return {
     username: raw.username ?? "",
     avatar_url: raw.avatar_url ?? "",
@@ -64,7 +138,9 @@ function normalizeGoodreadsProfile(raw: any) {
   };
 }
 
-function normalizeGoodreadsReview(raw: any) {
+function normalizeGoodreadsReview(
+  raw: RawGoodreadsReview
+): NormalizedPost {
   return {
     platform: "goodreads",
     post_id: raw.id,

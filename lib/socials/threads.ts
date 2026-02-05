@@ -1,17 +1,41 @@
 // lib/socials/threads.ts
 
-export async function syncThreads(account: any, supabase: any) {
-  const { access_token, refresh_token, user_id } = account;
+import type { Account } from "./socialIndex";
+import type { SupabaseClient } from "@supabase/supabase-js";
+import type { Database } from "@/supabase/types";
+
+export async function syncThreads(
+  account: Account,
+  supabase: SupabaseClient<Database>
+) {
+  const {
+    account_id,
+    user_id,
+    access_token,
+    refresh_token,
+    expires_at,
+  } = account as unknown as {
+    account_id: string;
+    user_id: string;
+    access_token: string;
+    refresh_token?: string;
+    expires_at?: number;
+  };
 
   if (!access_token) {
     return {
       platform: "threads",
       updated: false,
       error: "Missing access token",
+      account_id,
     };
   }
 
-  const refreshed = await refreshThreadsTokenIfNeeded(account, supabase);
+  // Threads refresh placeholder (kept consistent with universal pattern)
+  const refreshed = await refreshThreadsTokenIfNeeded(
+    { account_id, user_id, access_token, refresh_token, expires_at },
+    supabase
+  );
 
   const profile = await fetchThreadsProfile(refreshed.access_token);
   const posts = await fetchThreadsPosts(refreshed.access_token);
@@ -19,7 +43,11 @@ export async function syncThreads(account: any, supabase: any) {
   const normalizedProfile = normalizeThreadsProfile(profile);
   const normalizedPosts = posts.map(normalizeThreadsPost);
 
+  /* ---------------------------------
+     social_profiles
+  ----------------------------------*/
   await supabase.from("social_profiles").upsert({
+    account_id,
     user_id,
     platform: "threads",
     username: normalizedProfile.username,
@@ -29,8 +57,17 @@ export async function syncThreads(account: any, supabase: any) {
     last_synced: new Date().toISOString(),
   });
 
+  /* ---------------------------------
+     social_posts
+  ----------------------------------*/
   if (normalizedPosts.length > 0) {
-    await supabase.from("social_posts").upsert(normalizedPosts);
+    await supabase.from("social_posts").upsert(
+      normalizedPosts.map((p) => ({
+        ...p,
+        user_id,
+        account_id,
+      }))
+    );
   }
 
   return {
@@ -38,16 +75,67 @@ export async function syncThreads(account: any, supabase: any) {
     updated: true,
     posts: normalizedPosts.length,
     metrics: true,
+    account_id,
   };
 }
 
-/* Helper functions */
+/* -----------------------------
+   Local Types
+------------------------------*/
 
-async function refreshThreadsTokenIfNeeded(account: any, supabase: any) {
-  return account;
+type RawThreadsProfile = {
+  username?: string;
+  profile_picture?: string;
+  followers_count?: number;
+  following_count?: number;
+};
+
+type RawThreadsPost = {
+  id: string;
+  text?: string;
+  media_url?: string;
+  like_count?: number;
+  reply_count?: number;
+  created_at?: string;
+};
+
+type NormalizedProfile = {
+  username: string;
+  avatar_url: string;
+  followers: number;
+  following: number;
+};
+
+type NormalizedPost = {
+  platform: string;
+  post_id: string;
+  caption: string;
+  media_url: string;
+  likes: number;
+  comments: number;
+  posted_at: string;
+};
+
+/* -----------------------------
+   Helpers
+------------------------------*/
+
+async function refreshThreadsTokenIfNeeded(
+  account: {
+    account_id: string;
+    user_id: string;
+    access_token: string;
+    refresh_token?: string;
+    expires_at?: number;
+  },
+  supabase: SupabaseClient<Database>
+) {
+  return account; // placeholder logic
 }
 
-async function fetchThreadsProfile(accessToken: string) {
+async function fetchThreadsProfile(
+  accessToken: string
+): Promise<RawThreadsProfile> {
   return {
     username: "placeholder",
     profile_picture: "",
@@ -56,7 +144,9 @@ async function fetchThreadsProfile(accessToken: string) {
   };
 }
 
-async function fetchThreadsPosts(accessToken: string) {
+async function fetchThreadsPosts(
+  accessToken: string
+): Promise<RawThreadsPost[]> {
   return [
     {
       id: "1",
@@ -69,7 +159,9 @@ async function fetchThreadsPosts(accessToken: string) {
   ];
 }
 
-function normalizeThreadsProfile(raw: any) {
+function normalizeThreadsProfile(
+  raw: RawThreadsProfile
+): NormalizedProfile {
   return {
     username: raw.username ?? "",
     avatar_url: raw.profile_picture ?? "",
@@ -78,7 +170,9 @@ function normalizeThreadsProfile(raw: any) {
   };
 }
 
-function normalizeThreadsPost(raw: any) {
+function normalizeThreadsPost(
+  raw: RawThreadsPost
+): NormalizedPost {
   return {
     platform: "threads",
     post_id: raw.id,

@@ -1,7 +1,17 @@
 // lib/socials/github.ts
 
-export async function syncGitHub(account: any, supabase: any) {
-  const { access_token, user_id } = account;
+import type { Account } from "./socialIndex";
+import type { SupabaseClient } from "@supabase/supabase-js";
+import type { Database } from "@/supabase/types";
+
+export async function syncGitHub(
+  account: Account,
+  supabase: SupabaseClient<Database>
+) {
+  const { access_token, user_id } = account as unknown as {
+    access_token: string;
+    user_id: string;
+  };
 
   if (!access_token) {
     return {
@@ -11,7 +21,10 @@ export async function syncGitHub(account: any, supabase: any) {
     };
   }
 
-  const refreshed = await refreshGitHubTokenIfNeeded(account, supabase);
+  const refreshed = await refreshGitHubTokenIfNeeded(
+    account as unknown as GitHubAccount,
+    supabase
+  );
 
   const profile = await fetchGitHubProfile(refreshed.access_token);
   const posts = await fetchGitHubActivity(refreshed.access_token);
@@ -30,7 +43,12 @@ export async function syncGitHub(account: any, supabase: any) {
   });
 
   if (normalizedPosts.length > 0) {
-    await supabase.from("social_posts").upsert(normalizedPosts);
+    await supabase.from("social_posts").upsert(
+      normalizedPosts.map((p) => ({
+        ...p,
+        user_id,
+      }))
+    );
   }
 
   return {
@@ -41,13 +59,60 @@ export async function syncGitHub(account: any, supabase: any) {
   };
 }
 
-/* Helpers */
+/* -----------------------------
+   Local Types
+------------------------------*/
 
-async function refreshGitHubTokenIfNeeded(account: any, supabase: any) {
-  return account;
+type GitHubAccount = {
+  access_token: string;
+  user_id: string;
+};
+
+type RawGitHubProfile = {
+  login?: string;
+  avatar_url?: string;
+  followers?: number;
+  following?: number;
+};
+
+type RawGitHubEvent = {
+  id: string;
+  type?: string;
+  repo?: { name?: string };
+  created_at?: string;
+};
+
+type NormalizedProfile = {
+  username: string;
+  avatar_url: string;
+  followers: number;
+  following: number;
+};
+
+type NormalizedPost = {
+  platform: string;
+  post_id: string;
+  caption: string;
+  media_url: string;
+  likes: number;
+  comments: number;
+  posted_at: string;
+};
+
+/* -----------------------------
+   Helpers
+------------------------------*/
+
+async function refreshGitHubTokenIfNeeded(
+  account: GitHubAccount,
+  supabase: SupabaseClient<Database>
+): Promise<GitHubAccount> {
+  return account; // placeholder logic
 }
 
-async function fetchGitHubProfile(accessToken: string) {
+async function fetchGitHubProfile(
+  accessToken: string
+): Promise<RawGitHubProfile> {
   return {
     login: "placeholder",
     avatar_url: "",
@@ -56,7 +121,9 @@ async function fetchGitHubProfile(accessToken: string) {
   };
 }
 
-async function fetchGitHubActivity(accessToken: string) {
+async function fetchGitHubActivity(
+  accessToken: string
+): Promise<RawGitHubEvent[]> {
   return [
     {
       id: "1",
@@ -67,7 +134,9 @@ async function fetchGitHubActivity(accessToken: string) {
   ];
 }
 
-function normalizeGitHubProfile(raw: any) {
+function normalizeGitHubProfile(
+  raw: RawGitHubProfile
+): NormalizedProfile {
   return {
     username: raw.login ?? "",
     avatar_url: raw.avatar_url ?? "",
@@ -76,11 +145,13 @@ function normalizeGitHubProfile(raw: any) {
   };
 }
 
-function normalizeGitHubEvent(raw: any) {
+function normalizeGitHubEvent(
+  raw: RawGitHubEvent
+): NormalizedPost {
   return {
     platform: "github",
     post_id: raw.id,
-    caption: raw.type + " in " + (raw.repo?.name ?? ""),
+    caption: `${raw.type ?? "Event"} in ${raw.repo?.name ?? ""}`,
     media_url: "",
     likes: 0,
     comments: 0,

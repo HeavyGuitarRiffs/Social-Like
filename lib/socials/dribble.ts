@@ -1,6 +1,13 @@
 // lib/socials/dribbble.ts
 
-export async function syncDribbble(account: any, supabase: any) {
+import type { Account } from "./socialIndex";                 // <-- UNIVERSAL TYPE
+import type { SupabaseClient } from "@supabase/supabase-js";
+import type { Database } from "@/supabase/types";
+
+export async function syncDribbble(
+  account: Account,                                           // <-- FIXED
+  supabase: SupabaseClient<Database>                          // <-- FIXED
+) {
   const { access_token, user_id } = account;
 
   if (!access_token) {
@@ -11,7 +18,10 @@ export async function syncDribbble(account: any, supabase: any) {
     };
   }
 
-  const refreshed = await refreshDribbbleTokenIfNeeded(account, supabase);
+  const refreshed = await refreshDribbbleTokenIfNeeded(
+    account as unknown as DribbbleAccount,                    // <-- Dribbble-specific fields
+    supabase
+  );
 
   const profile = await fetchDribbbleProfile(refreshed.access_token);
   const posts = await fetchDribbbleShots(refreshed.access_token);
@@ -30,7 +40,12 @@ export async function syncDribbble(account: any, supabase: any) {
   });
 
   if (normalizedPosts.length > 0) {
-    await supabase.from("social_posts").upsert(normalizedPosts);
+    await supabase.from("social_posts").upsert(
+      normalizedPosts.map((p) => ({
+        ...p,
+        user_id,
+      }))
+    );
   }
 
   return {
@@ -41,13 +56,62 @@ export async function syncDribbble(account: any, supabase: any) {
   };
 }
 
-/* Helpers */
+/* -----------------------------
+   Local Types
+------------------------------*/
 
-async function refreshDribbbleTokenIfNeeded(account: any, supabase: any) {
-  return account;
+type DribbbleAccount = {
+  access_token: string;
+  user_id: string;
+};
+
+type RawDribbbleProfile = {
+  name?: string;
+  avatar_url?: string;
+  followers_count?: number;
+  following_count?: number;
+};
+
+type RawDribbbleShot = {
+  id: string;
+  title?: string;
+  images?: { normal?: string };
+  likes_count?: number;
+  comments_count?: number;
+  published_at?: string;
+};
+
+type NormalizedProfile = {
+  username: string;
+  avatar_url: string;
+  followers: number;
+  following: number;
+};
+
+type NormalizedPost = {
+  platform: string;
+  post_id: string;
+  caption: string;
+  media_url: string;
+  likes: number;
+  comments: number;
+  posted_at: string;
+};
+
+/* -----------------------------
+   Helpers
+------------------------------*/
+
+async function refreshDribbbleTokenIfNeeded(
+  account: DribbbleAccount,
+  supabase: SupabaseClient<Database>
+): Promise<DribbbleAccount> {
+  return account; // placeholder logic
 }
 
-async function fetchDribbbleProfile(accessToken: string) {
+async function fetchDribbbleProfile(
+  accessToken: string
+): Promise<RawDribbbleProfile> {
   return {
     name: "Placeholder Designer",
     avatar_url: "",
@@ -56,7 +120,9 @@ async function fetchDribbbleProfile(accessToken: string) {
   };
 }
 
-async function fetchDribbbleShots(accessToken: string) {
+async function fetchDribbbleShots(
+  accessToken: string
+): Promise<RawDribbbleShot[]> {
   return [
     {
       id: "1",
@@ -69,7 +135,9 @@ async function fetchDribbbleShots(accessToken: string) {
   ];
 }
 
-function normalizeDribbbleProfile(raw: any) {
+function normalizeDribbbleProfile(
+  raw: RawDribbbleProfile
+): NormalizedProfile {
   return {
     username: raw.name ?? "",
     avatar_url: raw.avatar_url ?? "",
@@ -78,7 +146,9 @@ function normalizeDribbbleProfile(raw: any) {
   };
 }
 
-function normalizeDribbbleShot(raw: any) {
+function normalizeDribbbleShot(
+  raw: RawDribbbleShot
+): NormalizedPost {
   return {
     platform: "dribbble",
     post_id: raw.id,

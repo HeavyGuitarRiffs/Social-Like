@@ -1,74 +1,155 @@
-// lib/socials/soundclick.ts
+// lib/socials/odysee.ts
 
-export async function syncSoundClick(account: any, supabase: any) {
+export async function syncOdysee(
+  account: OdyseeAccount,
+  supabase: SupabaseClientLike
+): Promise<SyncResult> {
   const { username, user_id } = account;
 
   if (!username) {
-    return { platform: "soundclick", updated: false, error: "Missing username" };
+    return {
+      platform: "odysee",
+      updated: false,
+      error: "Missing username",
+    };
   }
 
-  const profile = await fetchSoundClickProfile(username);
-  const posts = await fetchSoundClickSongs(username);
+  const profile = await fetchOdyseeProfile(username);
+  const posts = await fetchOdyseeVideos(username);
 
-  const normalizedProfile = normalizeSoundClickProfile(profile);
-  const normalizedPosts = posts.map(normalizeSoundClickSong);
+  const normalizedProfile = normalizeOdyseeProfile(profile);
+  const normalizedPosts = posts.map(normalizeOdyseeVideo);
 
   await supabase.from("social_profiles").upsert({
     user_id,
-    platform: "soundclick",
+    platform: "odysee",
     username: normalizedProfile.username,
     avatar_url: normalizedProfile.avatar_url,
     followers: normalizedProfile.followers,
-    following: 0,
-    last_synced: new Date().toISOString()
+    following: 0, // Odysee does not expose following count
+    last_synced: new Date().toISOString(),
   });
 
   if (normalizedPosts.length > 0) {
-    await supabase.from("social_posts").upsert(normalizedPosts);
+    await supabase.from("social_posts").upsert(
+      normalizedPosts.map((p) => ({
+        ...p,
+        user_id,
+      }))
+    );
   }
 
-  return { platform: "soundclick", updated: true, posts: normalizedPosts.length, metrics: true };
-}
-
-/* Helpers */
-
-async function fetchSoundClickProfile(username: string) {
   return {
-    username: "Placeholder SoundClick Artist",
-    avatar_url: "",
-    followers: 0
+    platform: "odysee",
+    updated: true,
+    posts: normalizedPosts.length,
+    metrics: true,
   };
 }
 
-async function fetchSoundClickSongs(username: string) {
+/* -----------------------------
+   Local Types
+------------------------------*/
+
+type SyncResult = {
+  platform: string;
+  updated: boolean;
+  posts?: number;
+  metrics?: boolean;
+  error?: string;
+};
+
+type SupabaseClientLike = {
+  from: (table: string) => {
+    upsert: (values: unknown) => Promise<unknown>;
+  };
+};
+
+type OdyseeAccount = {
+  username: string;
+  user_id: string;
+};
+
+type RawOdyseeProfile = {
+  name?: string;
+  thumbnail_url?: string;
+  followers?: number;
+};
+
+type RawOdyseeVideo = {
+  id: string;
+  title?: string;
+  thumbnail_url?: string;
+  views?: number;
+  comments?: number;
+  created_at?: string;
+};
+
+type NormalizedProfile = {
+  username: string;
+  avatar_url: string;
+  followers: number;
+};
+
+type NormalizedPost = {
+  platform: string;
+  post_id: string;
+  caption: string;
+  media_url: string;
+  likes: number;
+  comments: number;
+  posted_at: string;
+};
+
+/* -----------------------------
+   Helpers
+------------------------------*/
+
+async function fetchOdyseeProfile(
+  username: string
+): Promise<RawOdyseeProfile> {
+  return {
+    name: "Placeholder Odysee Channel",
+    thumbnail_url: "",
+    followers: 0,
+  };
+}
+
+async function fetchOdyseeVideos(
+  username: string
+): Promise<RawOdyseeVideo[]> {
   return [
     {
       id: "1",
-      title: "Placeholder SoundClick Song",
-      image_url: "",
-      plays: 0,
+      title: "Placeholder Odysee Video",
+      thumbnail_url: "",
+      views: 0,
       comments: 0,
-      created_at: new Date().toISOString()
-    }
+      created_at: new Date().toISOString(),
+    },
   ];
 }
 
-function normalizeSoundClickProfile(raw: any) {
+function normalizeOdyseeProfile(
+  raw: RawOdyseeProfile
+): NormalizedProfile {
   return {
-    username: raw.username ?? "",
-    avatar_url: raw.avatar_url ?? "",
-    followers: raw.followers ?? 0
+    username: raw.name ?? "",
+    avatar_url: raw.thumbnail_url ?? "",
+    followers: raw.followers ?? 0,
   };
 }
 
-function normalizeSoundClickSong(raw: any) {
+function normalizeOdyseeVideo(
+  raw: RawOdyseeVideo
+): NormalizedPost {
   return {
-    platform: "soundclick",
+    platform: "odysee",
     post_id: raw.id,
     caption: raw.title ?? "",
-    media_url: raw.image_url ?? "",
-    likes: raw.plays ?? 0,
+    media_url: raw.thumbnail_url ?? "",
+    likes: raw.views ?? 0,
     comments: raw.comments ?? 0,
-    posted_at: raw.created_at ?? new Date().toISOString()
+    posted_at: raw.created_at ?? new Date().toISOString(),
   };
 }

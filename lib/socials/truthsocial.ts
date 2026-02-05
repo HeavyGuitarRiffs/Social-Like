@@ -1,17 +1,41 @@
 // lib/socials/truthsocial.ts
 
-export async function syncTruthSocial(account: any, supabase: any) {
-  const { access_token, user_id } = account;
+import type { Account } from "./socialIndex";
+import type { SupabaseClient } from "@supabase/supabase-js";
+import type { Database } from "@/supabase/types";
+
+export async function syncTruthSocial(
+  account: Account,
+  supabase: SupabaseClient<Database>
+) {
+  const {
+    account_id,
+    user_id,
+    access_token,
+    refresh_token,
+    expires_at,
+  } = account as unknown as {
+    account_id: string;
+    user_id: string;
+    access_token: string;
+    refresh_token?: string;
+    expires_at?: number;
+  };
 
   if (!access_token) {
     return {
       platform: "truthsocial",
       updated: false,
       error: "Missing access token",
+      account_id,
     };
   }
 
-  const refreshed = await refreshTruthSocialTokenIfNeeded(account, supabase);
+  // Truth Social refresh placeholder (kept consistent with universal pattern)
+  const refreshed = await refreshTruthSocialTokenIfNeeded(
+    { account_id, user_id, access_token, refresh_token, expires_at },
+    supabase
+  );
 
   const profile = await fetchTruthSocialProfile(refreshed.access_token);
   const posts = await fetchTruthSocialPosts(refreshed.access_token);
@@ -19,7 +43,11 @@ export async function syncTruthSocial(account: any, supabase: any) {
   const normalizedProfile = normalizeTruthSocialProfile(profile);
   const normalizedPosts = posts.map(normalizeTruthSocialPost);
 
+  /* ---------------------------------
+     social_profiles
+  ----------------------------------*/
   await supabase.from("social_profiles").upsert({
+    account_id,
     user_id,
     platform: "truthsocial",
     username: normalizedProfile.username,
@@ -29,8 +57,17 @@ export async function syncTruthSocial(account: any, supabase: any) {
     last_synced: new Date().toISOString(),
   });
 
+  /* ---------------------------------
+     social_posts
+  ----------------------------------*/
   if (normalizedPosts.length > 0) {
-    await supabase.from("social_posts").upsert(normalizedPosts);
+    await supabase.from("social_posts").upsert(
+      normalizedPosts.map((p) => ({
+        ...p,
+        user_id,
+        account_id,
+      }))
+    );
   }
 
   return {
@@ -38,16 +75,67 @@ export async function syncTruthSocial(account: any, supabase: any) {
     updated: true,
     posts: normalizedPosts.length,
     metrics: true,
+    account_id,
   };
 }
 
-/* Helpers */
+/* -----------------------------
+   Local Types
+------------------------------*/
 
-async function refreshTruthSocialTokenIfNeeded(account: any, supabase: any) {
-  return account;
+type RawTruthSocialProfile = {
+  username?: string;
+  avatar_url?: string;
+  followers_count?: number;
+  following_count?: number;
+};
+
+type RawTruthSocialPost = {
+  id: string;
+  content?: string;
+  media_url?: string;
+  like_count?: number;
+  reply_count?: number;
+  created_at?: string;
+};
+
+type NormalizedProfile = {
+  username: string;
+  avatar_url: string;
+  followers: number;
+  following: number;
+};
+
+type NormalizedPost = {
+  platform: string;
+  post_id: string;
+  caption: string;
+  media_url: string;
+  likes: number;
+  comments: number;
+  posted_at: string;
+};
+
+/* -----------------------------
+   Helpers
+------------------------------*/
+
+async function refreshTruthSocialTokenIfNeeded(
+  account: {
+    account_id: string;
+    user_id: string;
+    access_token: string;
+    refresh_token?: string;
+    expires_at?: number;
+  },
+  supabase: SupabaseClient<Database>
+) {
+  return account; // placeholder logic
 }
 
-async function fetchTruthSocialProfile(accessToken: string) {
+async function fetchTruthSocialProfile(
+  accessToken: string
+): Promise<RawTruthSocialProfile> {
   return {
     username: "Placeholder Truth User",
     avatar_url: "",
@@ -56,7 +144,9 @@ async function fetchTruthSocialProfile(accessToken: string) {
   };
 }
 
-async function fetchTruthSocialPosts(accessToken: string) {
+async function fetchTruthSocialPosts(
+  accessToken: string
+): Promise<RawTruthSocialPost[]> {
   return [
     {
       id: "1",
@@ -69,7 +159,9 @@ async function fetchTruthSocialPosts(accessToken: string) {
   ];
 }
 
-function normalizeTruthSocialProfile(raw: any) {
+function normalizeTruthSocialProfile(
+  raw: RawTruthSocialProfile
+): NormalizedProfile {
   return {
     username: raw.username ?? "",
     avatar_url: raw.avatar_url ?? "",
@@ -78,7 +170,9 @@ function normalizeTruthSocialProfile(raw: any) {
   };
 }
 
-function normalizeTruthSocialPost(raw: any) {
+function normalizeTruthSocialPost(
+  raw: RawTruthSocialPost
+): NormalizedPost {
   return {
     platform: "truthsocial",
     post_id: raw.id,

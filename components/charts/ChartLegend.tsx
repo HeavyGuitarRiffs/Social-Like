@@ -10,10 +10,10 @@ type Props = {
 };
 
 export function ChartLegend({ data, label }: Props) {
-  if (!data.length) return null;
-
-  const { theme } = useTheme();
+  const { theme } = useTheme(); // <-- moved above conditional
   const isDark = theme === "dark";
+
+  if (!data.length) return null; // <-- now safe
 
   const last = data[data.length - 1];
   const prev = data[data.length - 2] ?? last;
@@ -24,7 +24,6 @@ export function ChartLegend({ data, label }: Props) {
   const isUp = pct > 0;
   const isDown = pct < 0;
 
-  // Metric-aware colors
   const metricColors: Record<string, string> = {
     comments: "#22C55E",
     likes: "#3B82F6",
@@ -37,7 +36,6 @@ export function ChartLegend({ data, label }: Props) {
 
   const arrow = isUp ? "▲" : isDown ? "▼" : "→";
 
-  // Number formatter
   function formatNumber(n: number) {
     if (n >= 10_000_000) return (n / 1_000_000).toFixed(1) + "M";
     if (n >= 1_000_000) return (n / 1_000_000).toFixed(2) + "M";
@@ -47,7 +45,6 @@ export function ChartLegend({ data, label }: Props) {
     return n.toString();
   }
 
-  // Smart scale detection
   const maxValue = Math.max(...data.map((d) => d.value));
 
   let scaleLabel = "";
@@ -58,7 +55,6 @@ export function ChartLegend({ data, label }: Props) {
   else if (maxValue >= 1_000) scaleLabel = "thousands";
   else if (maxValue >= 100) scaleLabel = "hundreds";
 
-  // Sparkline points
   const sparkPoints = data
     .map((d, i) => {
       const x = i * (60 / data.length);
@@ -82,7 +78,6 @@ export function ChartLegend({ data, label }: Props) {
           Last value: {formatNumber(last.value)}
         </span>
 
-        {/* Sparkline */}
         <svg width="60" height="20" className="mt-1">
           <polyline
             fill="none"
@@ -93,10 +88,7 @@ export function ChartLegend({ data, label }: Props) {
         </svg>
       </div>
 
-      <span
-        className="flex items-center gap-2"
-        style={{ color: metricColor }}
-      >
+      <span className="flex items-center gap-2" style={{ color: metricColor }}>
         <span className="text-3xl">{arrow}</span>
         <span className="text-3xl">
           {pct >= 0 ? "+" : ""}

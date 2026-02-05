@@ -1,10 +1,24 @@
 // lib/socials/ello.ts
 
-export async function syncEllo(account: any, supabase: any) {
-  const { username, user_id } = account;
+import type { Account } from "./socialIndex";                 
+import type { SupabaseClient } from "@supabase/supabase-js";
+import type { Database } from "@/supabase/types";
+
+export async function syncEllo(
+  account: Account,
+  supabase: SupabaseClient<Database>
+) {
+  const { username, user_id } = account as unknown as {
+    username: string;
+    user_id: string;
+  };
 
   if (!username) {
-    return { platform: "ello", updated: false, error: "Missing username" };
+    return {
+      platform: "ello",
+      updated: false,
+      error: "Missing username",
+    };
   }
 
   const profile = await fetchElloProfile(username);
@@ -20,27 +34,78 @@ export async function syncEllo(account: any, supabase: any) {
     avatar_url: normalizedProfile.avatar_url,
     followers: normalizedProfile.followers,
     following: 0,
-    last_synced: new Date().toISOString()
+    last_synced: new Date().toISOString(),
   });
 
   if (normalizedPosts.length > 0) {
-    await supabase.from("social_posts").upsert(normalizedPosts);
+    await supabase.from("social_posts").upsert(
+      normalizedPosts.map((p) => ({
+        ...p,
+        user_id,
+      }))
+    );
   }
 
-  return { platform: "ello", updated: true, posts: normalizedPosts.length, metrics: true };
-}
-
-/* Helpers */
-
-async function fetchElloProfile(username: string) {
   return {
-    username: "Placeholder Ello Artist",
-    avatar_url: "",
-    followers: 0
+    platform: "ello",
+    updated: true,
+    posts: normalizedPosts.length,
+    metrics: true,
   };
 }
 
-async function fetchElloPosts(username: string) {
+/* -----------------------------
+   Local Types
+------------------------------*/
+
+type RawElloProfile = {
+  username?: string;
+  avatar_url?: string;
+  followers?: number;
+};
+
+type RawElloPost = {
+  id: string;
+  title?: string;
+  image_url?: string;
+  loves?: number;
+  comments?: number;
+  created_at?: string;
+};
+
+type NormalizedProfile = {
+  username: string;
+  avatar_url: string;
+  followers: number;
+};
+
+type NormalizedPost = {
+  platform: string;
+  post_id: string;
+  caption: string;
+  media_url: string;
+  likes: number;
+  comments: number;
+  posted_at: string;
+};
+
+/* -----------------------------
+   Placeholder Fetchers
+------------------------------*/
+
+async function fetchElloProfile(
+  username: string
+): Promise<RawElloProfile> {
+  return {
+    username: "Placeholder Ello Artist",
+    avatar_url: "",
+    followers: 0,
+  };
+}
+
+async function fetchElloPosts(
+  username: string
+): Promise<RawElloPost[]> {
   return [
     {
       id: "1",
@@ -48,20 +113,28 @@ async function fetchElloPosts(username: string) {
       image_url: "",
       loves: 0,
       comments: 0,
-      created_at: new Date().toISOString()
-    }
+      created_at: new Date().toISOString(),
+    },
   ];
 }
 
-function normalizeElloProfile(raw: any) {
+/* -----------------------------
+   Normalizers
+------------------------------*/
+
+function normalizeElloProfile(
+  raw: RawElloProfile
+): NormalizedProfile {
   return {
     username: raw.username ?? "",
     avatar_url: raw.avatar_url ?? "",
-    followers: raw.followers ?? 0
+    followers: raw.followers ?? 0,
   };
 }
 
-function normalizeElloPost(raw: any) {
+function normalizeElloPost(
+  raw: RawElloPost
+): NormalizedPost {
   return {
     platform: "ello",
     post_id: raw.id,
@@ -69,6 +142,6 @@ function normalizeElloPost(raw: any) {
     media_url: raw.image_url ?? "",
     likes: raw.loves ?? 0,
     comments: raw.comments ?? 0,
-    posted_at: raw.created_at ?? new Date().toISOString()
+    posted_at: raw.created_at ?? new Date().toISOString(),
   };
 }

@@ -1,21 +1,43 @@
-import { Account, SyncResult } from "./socialIndex";
+// lib/socials/xiaohongshu.ts
 
-export async function syncXiaohongshu(account: Account, supabase: any): Promise<SyncResult> {
-  const { username, user_id } = account;
+import type { Account } from "./socialIndex";
+import type { SupabaseClient } from "@supabase/supabase-js";
+import type { Database } from "@/supabase/types";
+
+export async function syncXiaohongshu(
+  account: Account,
+  supabase: SupabaseClient<Database>
+) {
+  const {
+    account_id,
+    user_id,
+    username,
+  } = account as unknown as {
+    account_id: string;
+    user_id: string;
+    username: string;
+  };
 
   if (!username) {
-    return { platform: "xiaohongshu", updated: false, error: "Missing username" };
+    return {
+      platform: "xiaohongshu",
+      updated: false,
+      error: "Missing username",
+      account_id,
+    };
   }
 
-  // Placeholder fetch functions
   const profile = await fetchRedProfile(username);
   const posts = await fetchRedPosts(username);
 
   const normalizedProfile = normalizeRedProfile(profile);
   const normalizedPosts = posts.map(normalizeRedPost);
 
-  // Upsert profile into Supabase
+  /* ---------------------------------
+     social_profiles
+  ----------------------------------*/
   await supabase.from("social_profiles").upsert({
+    account_id,
     user_id,
     platform: "xiaohongshu",
     username: normalizedProfile.username,
@@ -25,9 +47,17 @@ export async function syncXiaohongshu(account: Account, supabase: any): Promise<
     last_synced: new Date().toISOString(),
   });
 
-  // Upsert posts
+  /* ---------------------------------
+     social_posts
+  ----------------------------------*/
   if (normalizedPosts.length > 0) {
-    await supabase.from("social_posts").upsert(normalizedPosts);
+    await supabase.from("social_posts").upsert(
+      normalizedPosts.map((p) => ({
+        ...p,
+        user_id,
+        account_id,
+      }))
+    );
   }
 
   return {
@@ -35,15 +65,61 @@ export async function syncXiaohongshu(account: Account, supabase: any): Promise<
     updated: true,
     posts: normalizedPosts.length,
     metrics: true,
+    account_id,
   };
 }
 
-/* Placeholder fetch functions */
-async function fetchRedProfile(username: string) {
-  return { username, avatar_url: "", followers: 0, following: 0 };
+/* -----------------------------
+   Local Types
+------------------------------*/
+
+type RawRedProfile = {
+  username?: string;
+  avatar_url?: string;
+  followers?: number;
+  following?: number;
+};
+
+type RawRedPost = {
+  id: string;
+  caption?: string;
+  media_url?: string;
+  likes?: number;
+  comments?: number;
+  posted_at?: string;
+};
+
+type NormalizedProfile = {
+  username: string;
+  avatar_url: string;
+  followers: number;
+  following: number;
+};
+
+type NormalizedPost = {
+  platform: string;
+  post_id: string;
+  caption: string;
+  media_url: string;
+  likes: number;
+  comments: number;
+  posted_at: string;
+};
+
+/* -----------------------------
+   Placeholder Fetchers
+------------------------------*/
+
+async function fetchRedProfile(username: string): Promise<RawRedProfile> {
+  return {
+    username,
+    avatar_url: "",
+    followers: 0,
+    following: 0,
+  };
 }
 
-async function fetchRedPosts(username: string) {
+async function fetchRedPosts(username: string): Promise<RawRedPost[]> {
   return [
     {
       id: "1",
@@ -56,8 +132,11 @@ async function fetchRedPosts(username: string) {
   ];
 }
 
-/* Normalizers */
-function normalizeRedProfile(raw: any) {
+/* -----------------------------
+   Normalizers
+------------------------------*/
+
+function normalizeRedProfile(raw: RawRedProfile): NormalizedProfile {
   return {
     username: raw.username ?? "",
     avatar_url: raw.avatar_url ?? "",
@@ -66,7 +145,7 @@ function normalizeRedProfile(raw: any) {
   };
 }
 
-function normalizeRedPost(raw: any) {
+function normalizeRedPost(raw: RawRedPost): NormalizedPost {
   return {
     platform: "xiaohongshu",
     post_id: raw.id,

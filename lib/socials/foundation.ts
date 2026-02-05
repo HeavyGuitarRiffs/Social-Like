@@ -1,10 +1,24 @@
 // lib/socials/foundation.ts
 
-export async function syncFoundation(account: any, supabase: any) {
-  const { wallet_address, user_id } = account;
+import type { Account } from "./socialIndex";
+import type { SupabaseClient } from "@supabase/supabase-js";
+import type { Database } from "@/supabase/types";
+
+export async function syncFoundation(
+  account: Account,
+  supabase: SupabaseClient<Database>
+) {
+  const { wallet_address, user_id } = account as unknown as {
+    wallet_address: string;
+    user_id: string;
+  };
 
   if (!wallet_address) {
-    return { platform: "foundation", updated: false, error: "Missing wallet address" };
+    return {
+      platform: "foundation",
+      updated: false,
+      error: "Missing wallet address",
+    };
   }
 
   const profile = await fetchFoundationProfile(wallet_address);
@@ -24,15 +38,64 @@ export async function syncFoundation(account: any, supabase: any) {
   });
 
   if (normalizedPosts.length > 0) {
-    await supabase.from("social_posts").upsert(normalizedPosts);
+    await supabase.from("social_posts").upsert(
+      normalizedPosts.map((p) => ({
+        ...p,
+        user_id,
+      }))
+    );
   }
 
-  return { platform: "foundation", updated: true, posts: normalizedPosts.length, metrics: true };
+  return {
+    platform: "foundation",
+    updated: true,
+    posts: normalizedPosts.length,
+    metrics: true,
+  };
 }
 
-/* Helpers */
+/* -----------------------------
+   Local Types
+------------------------------*/
 
-async function fetchFoundationProfile(wallet: string) {
+type RawFoundationProfile = {
+  username?: string;
+  avatar_url?: string;
+  followers?: number;
+};
+
+type RawFoundationCreation = {
+  id: string;
+  name?: string;
+  image_url?: string;
+  likes?: number;
+  comments?: number;
+  created_at?: string;
+};
+
+type NormalizedProfile = {
+  username: string;
+  avatar_url: string;
+  followers: number;
+};
+
+type NormalizedPost = {
+  platform: string;
+  post_id: string;
+  caption: string;
+  media_url: string;
+  likes: number;
+  comments: number;
+  posted_at: string;
+};
+
+/* -----------------------------
+   Placeholder Fetchers
+------------------------------*/
+
+async function fetchFoundationProfile(
+  wallet: string
+): Promise<RawFoundationProfile> {
   return {
     username: "Placeholder Foundation Artist",
     avatar_url: "",
@@ -40,7 +103,9 @@ async function fetchFoundationProfile(wallet: string) {
   };
 }
 
-async function fetchFoundationCreations(wallet: string) {
+async function fetchFoundationCreations(
+  wallet: string
+): Promise<RawFoundationCreation[]> {
   return [
     {
       id: "1",
@@ -53,7 +118,13 @@ async function fetchFoundationCreations(wallet: string) {
   ];
 }
 
-function normalizeFoundationProfile(raw: any) {
+/* -----------------------------
+   Normalizers
+------------------------------*/
+
+function normalizeFoundationProfile(
+  raw: RawFoundationProfile
+): NormalizedProfile {
   return {
     username: raw.username ?? "",
     avatar_url: raw.avatar_url ?? "",
@@ -61,7 +132,9 @@ function normalizeFoundationProfile(raw: any) {
   };
 }
 
-function normalizeFoundationCreation(raw: any) {
+function normalizeFoundationCreation(
+  raw: RawFoundationCreation
+): NormalizedPost {
   return {
     platform: "foundation",
     post_id: raw.id,

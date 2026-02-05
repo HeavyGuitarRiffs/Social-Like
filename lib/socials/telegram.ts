@@ -1,6 +1,9 @@
 // lib/socials/telegram.ts
 
-export async function syncTelegram(account: any, supabase: any) {
+export async function syncTelegram(
+  account: TelegramAccount,
+  supabase: SupabaseClientLike
+): Promise<SyncResult> {
   const { access_token, user_id } = account;
 
   if (!access_token) {
@@ -25,12 +28,17 @@ export async function syncTelegram(account: any, supabase: any) {
     username: normalizedProfile.username,
     avatar_url: normalizedProfile.avatar_url,
     followers: normalizedProfile.followers,
-    following: 0,
+    following: 0, // Telegram does not expose following count
     last_synced: new Date().toISOString(),
   });
 
   if (normalizedPosts.length > 0) {
-    await supabase.from("social_posts").upsert(normalizedPosts);
+    await supabase.from("social_posts").upsert(
+      normalizedPosts.map((p) => ({
+        ...p,
+        user_id,
+      }))
+    );
   }
 
   return {
@@ -41,13 +49,72 @@ export async function syncTelegram(account: any, supabase: any) {
   };
 }
 
-/* Helpers */
+/* -----------------------------
+   Local Types
+------------------------------*/
 
-async function refreshTelegramTokenIfNeeded(account: any, supabase: any) {
-  return account;
+type TelegramAccount = {
+  access_token: string;
+  user_id: string;
+};
+
+type RawTelegramProfile = {
+  username?: string;
+  avatar_url?: string;
+  followers?: number;
+};
+
+type RawTelegramMessage = {
+  id: string;
+  text?: string;
+  media_url?: string;
+  created_at?: string;
+};
+
+type NormalizedProfile = {
+  username: string;
+  avatar_url: string;
+  followers: number;
+};
+
+type NormalizedPost = {
+  platform: string;
+  post_id: string;
+  caption: string;
+  media_url: string;
+  likes: number;
+  comments: number;
+  posted_at: string;
+};
+
+type SupabaseClientLike = {
+  from: (table: string) => {
+    upsert: (values: unknown) => Promise<unknown>;
+  };
+};
+
+type SyncResult = {
+  platform: string;
+  updated: boolean;
+  posts?: number;
+  metrics?: boolean;
+  error?: string;
+};
+
+/* -----------------------------
+   Helpers
+------------------------------*/
+
+async function refreshTelegramTokenIfNeeded(
+  account: TelegramAccount,
+  supabase: SupabaseClientLike
+): Promise<TelegramAccount> {
+  return account; // placeholder logic
 }
 
-async function fetchTelegramProfile(accessToken: string) {
+async function fetchTelegramProfile(
+  accessToken: string
+): Promise<RawTelegramProfile> {
   return {
     username: "Placeholder Telegram User",
     avatar_url: "",
@@ -55,7 +122,9 @@ async function fetchTelegramProfile(accessToken: string) {
   };
 }
 
-async function fetchTelegramMessages(accessToken: string) {
+async function fetchTelegramMessages(
+  accessToken: string
+): Promise<RawTelegramMessage[]> {
   return [
     {
       id: "1",
@@ -66,7 +135,9 @@ async function fetchTelegramMessages(accessToken: string) {
   ];
 }
 
-function normalizeTelegramProfile(raw: any) {
+function normalizeTelegramProfile(
+  raw: RawTelegramProfile
+): NormalizedProfile {
   return {
     username: raw.username ?? "",
     avatar_url: raw.avatar_url ?? "",
@@ -74,7 +145,9 @@ function normalizeTelegramProfile(raw: any) {
   };
 }
 
-function normalizeTelegramMessage(raw: any) {
+function normalizeTelegramMessage(
+  raw: RawTelegramMessage
+): NormalizedPost {
   return {
     platform: "telegram",
     post_id: raw.id,

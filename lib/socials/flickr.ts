@@ -1,10 +1,24 @@
 // lib/socials/flickr.ts
 
-export async function syncFlickr(account: any, supabase: any) {
-  const { access_token, user_id } = account;
+import type { Account } from "./socialIndex";
+import type { SupabaseClient } from "@supabase/supabase-js";
+import type { Database } from "@/supabase/types";
+
+export async function syncFlickr(
+  account: Account,
+  supabase: SupabaseClient<Database>
+) {
+  const { access_token, user_id } = account as unknown as {
+    access_token: string;
+    user_id: string;
+  };
 
   if (!access_token) {
-    return { platform: "flickr", updated: false, error: "Missing access token" };
+    return {
+      platform: "flickr",
+      updated: false,
+      error: "Missing access token",
+    };
   }
 
   const profile = await fetchFlickrProfile(access_token);
@@ -24,15 +38,66 @@ export async function syncFlickr(account: any, supabase: any) {
   });
 
   if (normalizedPosts.length > 0) {
-    await supabase.from("social_posts").upsert(normalizedPosts);
+    await supabase.from("social_posts").upsert(
+      normalizedPosts.map((p) => ({
+        ...p,
+        user_id,
+      }))
+    );
   }
 
-  return { platform: "flickr", updated: true, posts: normalizedPosts.length, metrics: true };
+  return {
+    platform: "flickr",
+    updated: true,
+    posts: normalizedPosts.length,
+    metrics: true,
+  };
 }
 
-/* Helpers */
+/* -----------------------------
+   Local Types
+------------------------------*/
 
-async function fetchFlickrProfile(accessToken: string) {
+type RawFlickrProfile = {
+  username?: string;
+  icon_url?: string;
+  followers?: number;
+  following?: number;
+};
+
+type RawFlickrPhoto = {
+  id: string;
+  title?: string;
+  url?: string;
+  views?: number;
+  comments?: number;
+  posted_at?: string;
+};
+
+type NormalizedProfile = {
+  username: string;
+  avatar_url: string;
+  followers: number;
+  following: number;
+};
+
+type NormalizedPost = {
+  platform: string;
+  post_id: string;
+  caption: string;
+  media_url: string;
+  likes: number;
+  comments: number;
+  posted_at: string;
+};
+
+/* -----------------------------
+   Placeholder Fetchers
+------------------------------*/
+
+async function fetchFlickrProfile(
+  accessToken: string
+): Promise<RawFlickrProfile> {
   return {
     username: "Placeholder Flickr User",
     icon_url: "",
@@ -41,7 +106,9 @@ async function fetchFlickrProfile(accessToken: string) {
   };
 }
 
-async function fetchFlickrPhotos(accessToken: string) {
+async function fetchFlickrPhotos(
+  accessToken: string
+): Promise<RawFlickrPhoto[]> {
   return [
     {
       id: "1",
@@ -54,7 +121,13 @@ async function fetchFlickrPhotos(accessToken: string) {
   ];
 }
 
-function normalizeFlickrProfile(raw: any) {
+/* -----------------------------
+   Normalizers
+------------------------------*/
+
+function normalizeFlickrProfile(
+  raw: RawFlickrProfile
+): NormalizedProfile {
   return {
     username: raw.username ?? "",
     avatar_url: raw.icon_url ?? "",
@@ -63,7 +136,9 @@ function normalizeFlickrProfile(raw: any) {
   };
 }
 
-function normalizeFlickrPhoto(raw: any) {
+function normalizeFlickrPhoto(
+  raw: RawFlickrPhoto
+): NormalizedPost {
   return {
     platform: "flickr",
     post_id: raw.id,

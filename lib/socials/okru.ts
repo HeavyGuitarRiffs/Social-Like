@@ -1,17 +1,41 @@
 // lib/socials/okru.ts
 
-export async function syncOKRu(account: any, supabase: any) {
-  const { access_token, user_id } = account;
+import type { Account } from "./socialIndex";
+import type { SupabaseClient } from "@supabase/supabase-js";
+import type { Database } from "@/supabase/types";
+
+export async function syncOKRu(
+  account: Account,
+  supabase: SupabaseClient<Database>
+) {
+  const {
+    account_id,
+    user_id,
+    access_token,
+    refresh_token,
+    expires_at,
+  } = account as unknown as {
+    account_id: string;
+    user_id: string;
+    access_token: string;
+    refresh_token?: string;
+    expires_at?: number;
+  };
 
   if (!access_token) {
     return {
       platform: "okru",
       updated: false,
       error: "Missing access token",
+      account_id,
     };
   }
 
-  const refreshed = await refreshOKRuTokenIfNeeded(account, supabase);
+  // OK.ru token refresh placeholder (kept consistent with universal pattern)
+  const refreshed = await refreshOKRuTokenIfNeeded(
+    { account_id, user_id, access_token, refresh_token, expires_at },
+    supabase
+  );
 
   const profile = await fetchOKRuProfile(refreshed.access_token);
   const posts = await fetchOKRuPosts(refreshed.access_token);
@@ -19,7 +43,11 @@ export async function syncOKRu(account: any, supabase: any) {
   const normalizedProfile = normalizeOKRuProfile(profile);
   const normalizedPosts = posts.map(normalizeOKRuPost);
 
+  /* ---------------------------------
+     social_profiles
+  ----------------------------------*/
   await supabase.from("social_profiles").upsert({
+    account_id,
     user_id,
     platform: "okru",
     username: normalizedProfile.username,
@@ -29,8 +57,17 @@ export async function syncOKRu(account: any, supabase: any) {
     last_synced: new Date().toISOString(),
   });
 
+  /* ---------------------------------
+     social_posts
+  ----------------------------------*/
   if (normalizedPosts.length > 0) {
-    await supabase.from("social_posts").upsert(normalizedPosts);
+    await supabase.from("social_posts").upsert(
+      normalizedPosts.map((p) => ({
+        ...p,
+        user_id,
+        account_id,
+      }))
+    );
   }
 
   return {
@@ -38,16 +75,67 @@ export async function syncOKRu(account: any, supabase: any) {
     updated: true,
     posts: normalizedPosts.length,
     metrics: true,
+    account_id,
   };
 }
 
-/* Helpers */
+/* -----------------------------
+   Local Types
+------------------------------*/
 
-async function refreshOKRuTokenIfNeeded(account: any, supabase: any) {
-  return account;
+type RawOKRuProfile = {
+  name?: string;
+  pic_full?: string;
+  followers_count?: number;
+  friends_count?: number;
+};
+
+type RawOKRuPost = {
+  id: string;
+  text?: string;
+  media_url?: string;
+  like_count?: number;
+  comment_count?: number;
+  created_ms?: number;
+};
+
+type NormalizedProfile = {
+  username: string;
+  avatar_url: string;
+  followers: number;
+  following: number;
+};
+
+type NormalizedPost = {
+  platform: string;
+  post_id: string;
+  caption: string;
+  media_url: string;
+  likes: number;
+  comments: number;
+  posted_at: string;
+};
+
+/* -----------------------------
+   Helpers
+------------------------------*/
+
+async function refreshOKRuTokenIfNeeded(
+  account: {
+    account_id: string;
+    user_id: string;
+    access_token: string;
+    refresh_token?: string;
+    expires_at?: number;
+  },
+  supabase: SupabaseClient<Database>
+) {
+  return account; // placeholder logic
 }
 
-async function fetchOKRuProfile(accessToken: string) {
+async function fetchOKRuProfile(
+  accessToken: string
+): Promise<RawOKRuProfile> {
   return {
     name: "Placeholder OK User",
     pic_full: "",
@@ -56,7 +144,9 @@ async function fetchOKRuProfile(accessToken: string) {
   };
 }
 
-async function fetchOKRuPosts(accessToken: string) {
+async function fetchOKRuPosts(
+  accessToken: string
+): Promise<RawOKRuPost[]> {
   return [
     {
       id: "1",
@@ -69,7 +159,9 @@ async function fetchOKRuPosts(accessToken: string) {
   ];
 }
 
-function normalizeOKRuProfile(raw: any) {
+function normalizeOKRuProfile(
+  raw: RawOKRuProfile
+): NormalizedProfile {
   return {
     username: raw.name ?? "",
     avatar_url: raw.pic_full ?? "",
@@ -78,7 +170,9 @@ function normalizeOKRuProfile(raw: any) {
   };
 }
 
-function normalizeOKRuPost(raw: any) {
+function normalizeOKRuPost(
+  raw: RawOKRuPost
+): NormalizedPost {
   return {
     platform: "okru",
     post_id: raw.id,
@@ -86,6 +180,8 @@ function normalizeOKRuPost(raw: any) {
     media_url: raw.media_url ?? "",
     likes: raw.like_count ?? 0,
     comments: raw.comment_count ?? 0,
-    posted_at: new Date(raw.created_ms).toISOString(),
+    posted_at: raw.created_ms
+      ? new Date(raw.created_ms).toISOString()
+      : new Date().toISOString(),
   };
 }

@@ -1,17 +1,41 @@
 // lib/socials/spotify.ts
 
-export async function syncSpotify(account: any, supabase: any) {
-  const { access_token, user_id } = account;
+import type { Account } from "./socialIndex";
+import type { SupabaseClient } from "@supabase/supabase-js";
+import type { Database } from "@/supabase/types";
+
+export async function syncSpotify(
+  account: Account,
+  supabase: SupabaseClient<Database>
+) {
+  const {
+    account_id,
+    user_id,
+    access_token,
+    refresh_token,
+    expires_at,
+  } = account as unknown as {
+    account_id: string;
+    user_id: string;
+    access_token: string;
+    refresh_token?: string;
+    expires_at?: number;
+  };
 
   if (!access_token) {
     return {
       platform: "spotify",
       updated: false,
       error: "Missing access token",
+      account_id,
     };
   }
 
-  const refreshed = await refreshSpotifyTokenIfNeeded(account, supabase);
+  // Spotify refresh placeholder (kept consistent with universal pattern)
+  const refreshed = await refreshSpotifyTokenIfNeeded(
+    { account_id, user_id, access_token, refresh_token, expires_at },
+    supabase
+  );
 
   const profile = await fetchSpotifyProfile(refreshed.access_token);
   const posts = await fetchSpotifyTracks(refreshed.access_token);
@@ -19,18 +43,31 @@ export async function syncSpotify(account: any, supabase: any) {
   const normalizedProfile = normalizeSpotifyProfile(profile);
   const normalizedPosts = posts.map(normalizeSpotifyTrack);
 
+  /* ---------------------------------
+     social_profiles
+  ----------------------------------*/
   await supabase.from("social_profiles").upsert({
+    account_id,
     user_id,
     platform: "spotify",
     username: normalizedProfile.username,
     avatar_url: normalizedProfile.avatar_url,
     followers: normalizedProfile.followers,
-    following: 0,
+    following: 0, // Spotify does not expose following count
     last_synced: new Date().toISOString(),
   });
 
+  /* ---------------------------------
+     social_posts
+  ----------------------------------*/
   if (normalizedPosts.length > 0) {
-    await supabase.from("social_posts").upsert(normalizedPosts);
+    await supabase.from("social_posts").upsert(
+      normalizedPosts.map((p) => ({
+        ...p,
+        user_id,
+        account_id,
+      }))
+    );
   }
 
   return {
@@ -38,16 +75,64 @@ export async function syncSpotify(account: any, supabase: any) {
     updated: true,
     posts: normalizedPosts.length,
     metrics: true,
+    account_id,
   };
 }
 
-/* Helpers */
+/* -----------------------------
+   Local Types
+------------------------------*/
 
-async function refreshSpotifyTokenIfNeeded(account: any, supabase: any) {
-  return account;
+type RawSpotifyProfile = {
+  display_name?: string;
+  images?: { url?: string }[];
+  followers?: { total?: number };
+};
+
+type RawSpotifyTrack = {
+  id: string;
+  name?: string;
+  album?: { images?: { url?: string }[] };
+  popularity?: number;
+  played_at?: string;
+};
+
+type NormalizedProfile = {
+  username: string;
+  avatar_url: string;
+  followers: number;
+};
+
+type NormalizedPost = {
+  platform: string;
+  post_id: string;
+  caption: string;
+  media_url: string;
+  likes: number;
+  comments: number;
+  posted_at: string;
+};
+
+/* -----------------------------
+   Helpers
+------------------------------*/
+
+async function refreshSpotifyTokenIfNeeded(
+  account: {
+    account_id: string;
+    user_id: string;
+    access_token: string;
+    refresh_token?: string;
+    expires_at?: number;
+  },
+  supabase: SupabaseClient<Database>
+) {
+  return account; // placeholder logic
 }
 
-async function fetchSpotifyProfile(accessToken: string) {
+async function fetchSpotifyProfile(
+  accessToken: string
+): Promise<RawSpotifyProfile> {
   return {
     display_name: "placeholder",
     images: [{ url: "" }],
@@ -55,7 +140,9 @@ async function fetchSpotifyProfile(accessToken: string) {
   };
 }
 
-async function fetchSpotifyTracks(accessToken: string) {
+async function fetchSpotifyTracks(
+  accessToken: string
+): Promise<RawSpotifyTrack[]> {
   return [
     {
       id: "1",
@@ -67,7 +154,9 @@ async function fetchSpotifyTracks(accessToken: string) {
   ];
 }
 
-function normalizeSpotifyProfile(raw: any) {
+function normalizeSpotifyProfile(
+  raw: RawSpotifyProfile
+): NormalizedProfile {
   return {
     username: raw.display_name ?? "",
     avatar_url: raw.images?.[0]?.url ?? "",
@@ -75,7 +164,9 @@ function normalizeSpotifyProfile(raw: any) {
   };
 }
 
-function normalizeSpotifyTrack(raw: any) {
+function normalizeSpotifyTrack(
+  raw: RawSpotifyTrack
+): NormalizedPost {
   return {
     platform: "spotify",
     post_id: raw.id,

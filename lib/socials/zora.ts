@@ -1,10 +1,30 @@
 // lib/socials/zora.ts
 
-export async function syncZora(account: any, supabase: any) {
-  const { wallet_address, user_id } = account;
+import type { Account } from "./socialIndex";
+import type { SupabaseClient } from "@supabase/supabase-js";
+import type { Database } from "@/supabase/types";
+
+export async function syncZora(
+  account: Account,
+  supabase: SupabaseClient<Database>
+) {
+  const {
+    account_id,
+    user_id,
+    wallet_address,
+  } = account as unknown as {
+    account_id: string;
+    user_id: string;
+    wallet_address: string;
+  };
 
   if (!wallet_address) {
-    return { platform: "zora", updated: false, error: "Missing wallet address" };
+    return {
+      platform: "zora",
+      updated: false,
+      error: "Missing wallet address",
+      account_id,
+    };
   }
 
   const profile = await fetchZoraProfile(wallet_address);
@@ -13,26 +33,82 @@ export async function syncZora(account: any, supabase: any) {
   const normalizedProfile = normalizeZoraProfile(profile);
   const normalizedPosts = posts.map(normalizeZoraMint);
 
+  /* ---------------------------------
+     social_profiles
+  ----------------------------------*/
   await supabase.from("social_profiles").upsert({
+    account_id,
     user_id,
     platform: "zora",
     username: normalizedProfile.username,
     avatar_url: normalizedProfile.avatar_url,
     followers: normalizedProfile.followers,
-    following: 0,
+    following: 0, // Zora does not expose following count
     last_synced: new Date().toISOString(),
   });
 
+  /* ---------------------------------
+     social_posts
+  ----------------------------------*/
   if (normalizedPosts.length > 0) {
-    await supabase.from("social_posts").upsert(normalizedPosts);
+    await supabase.from("social_posts").upsert(
+      normalizedPosts.map((p) => ({
+        ...p,
+        user_id,
+        account_id,
+      }))
+    );
   }
 
-  return { platform: "zora", updated: true, posts: normalizedPosts.length, metrics: true };
+  return {
+    platform: "zora",
+    updated: true,
+    posts: normalizedPosts.length,
+    metrics: true,
+    account_id,
+  };
 }
 
-/* Helpers */
+/* -----------------------------
+   Local Types
+------------------------------*/
 
-async function fetchZoraProfile(wallet: string) {
+type RawZoraProfile = {
+  username?: string;
+  avatar_url?: string;
+  followers?: number;
+};
+
+type RawZoraMint = {
+  id: string;
+  name?: string;
+  image_url?: string;
+  likes?: number;
+  comments?: number;
+  created_at?: string;
+};
+
+type NormalizedProfile = {
+  username: string;
+  avatar_url: string;
+  followers: number;
+};
+
+type NormalizedPost = {
+  platform: string;
+  post_id: string;
+  caption: string;
+  media_url: string;
+  likes: number;
+  comments: number;
+  posted_at: string;
+};
+
+/* -----------------------------
+   Helpers
+------------------------------*/
+
+async function fetchZoraProfile(wallet: string): Promise<RawZoraProfile> {
   return {
     username: "Placeholder Zora Creator",
     avatar_url: "",
@@ -40,7 +116,7 @@ async function fetchZoraProfile(wallet: string) {
   };
 }
 
-async function fetchZoraMints(wallet: string) {
+async function fetchZoraMints(wallet: string): Promise<RawZoraMint[]> {
   return [
     {
       id: "1",
@@ -53,7 +129,7 @@ async function fetchZoraMints(wallet: string) {
   ];
 }
 
-function normalizeZoraProfile(raw: any) {
+function normalizeZoraProfile(raw: RawZoraProfile): NormalizedProfile {
   return {
     username: raw.username ?? "",
     avatar_url: raw.avatar_url ?? "",
@@ -61,7 +137,7 @@ function normalizeZoraProfile(raw: any) {
   };
 }
 
-function normalizeZoraMint(raw: any) {
+function normalizeZoraMint(raw: RawZoraMint): NormalizedPost {
   return {
     platform: "zora",
     post_id: raw.id,

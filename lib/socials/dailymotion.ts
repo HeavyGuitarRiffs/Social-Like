@@ -1,6 +1,13 @@
 // lib/socials/dailymotion.ts
 
-export async function syncDailymotion(account: any, supabase: any) {
+import type { Account } from "./socialIndex";                 // <-- UNIVERSAL TYPE
+import type { SupabaseClient } from "@supabase/supabase-js";
+import type { Database } from "@/supabase/types";
+
+export async function syncDailymotion(
+  account: Account,                                           // <-- FIXED
+  supabase: SupabaseClient<Database>                          // <-- FIXED
+) {
   const { access_token, user_id } = account;
 
   if (!access_token) {
@@ -11,7 +18,10 @@ export async function syncDailymotion(account: any, supabase: any) {
     };
   }
 
-  const refreshed = await refreshDailymotionTokenIfNeeded(account, supabase);
+  const refreshed = await refreshDailymotionTokenIfNeeded(
+    account as unknown as DailymotionAccount,                 // <-- Dailymotion-specific fields
+    supabase
+  );
 
   const profile = await fetchDailymotionProfile(refreshed.access_token);
   const posts = await fetchDailymotionVideos(refreshed.access_token);
@@ -30,7 +40,12 @@ export async function syncDailymotion(account: any, supabase: any) {
   });
 
   if (normalizedPosts.length > 0) {
-    await supabase.from("social_posts").upsert(normalizedPosts);
+    await supabase.from("social_posts").upsert(
+      normalizedPosts.map((p) => ({
+        ...p,
+        user_id,
+      }))
+    );
   }
 
   return {
@@ -41,13 +56,60 @@ export async function syncDailymotion(account: any, supabase: any) {
   };
 }
 
-/* Helpers */
+/* -----------------------------
+   Local Types
+------------------------------*/
 
-async function refreshDailymotionTokenIfNeeded(account: any, supabase: any) {
-  return account;
+type DailymotionAccount = {
+  access_token: string;
+  user_id: string;
+};
+
+type RawDailymotionProfile = {
+  username?: string;
+  avatar_720_url?: string;
+  fans_total?: number;
+};
+
+type RawDailymotionPost = {
+  id: string;
+  title?: string;
+  thumbnail_url?: string;
+  views_total?: number;
+  comments_total?: number;
+  created_time?: string;
+};
+
+type NormalizedProfile = {
+  username: string;
+  avatar_url: string;
+  followers: number;
+};
+
+type NormalizedPost = {
+  platform: string;
+  post_id: string;
+  caption: string;
+  media_url: string;
+  likes: number;
+  comments: number;
+  posted_at: string;
+};
+
+/* -----------------------------
+   Helpers
+------------------------------*/
+
+async function refreshDailymotionTokenIfNeeded(
+  account: DailymotionAccount,
+  supabase: SupabaseClient<Database>
+): Promise<DailymotionAccount> {
+  return account; // placeholder logic
 }
 
-async function fetchDailymotionProfile(accessToken: string) {
+async function fetchDailymotionProfile(
+  accessToken: string
+): Promise<RawDailymotionProfile> {
   return {
     username: "Placeholder DM User",
     avatar_720_url: "",
@@ -55,7 +117,9 @@ async function fetchDailymotionProfile(accessToken: string) {
   };
 }
 
-async function fetchDailymotionVideos(accessToken: string) {
+async function fetchDailymotionVideos(
+  accessToken: string
+): Promise<RawDailymotionPost[]> {
   return [
     {
       id: "1",
@@ -68,7 +132,9 @@ async function fetchDailymotionVideos(accessToken: string) {
   ];
 }
 
-function normalizeDailymotionProfile(raw: any) {
+function normalizeDailymotionProfile(
+  raw: RawDailymotionProfile
+): NormalizedProfile {
   return {
     username: raw.username ?? "",
     avatar_url: raw.avatar_720_url ?? "",
@@ -76,7 +142,9 @@ function normalizeDailymotionProfile(raw: any) {
   };
 }
 
-function normalizeDailymotionVideo(raw: any) {
+function normalizeDailymotionVideo(
+  raw: RawDailymotionPost
+): NormalizedPost {
   return {
     platform: "dailymotion",
     post_id: raw.id,

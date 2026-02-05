@@ -1,17 +1,41 @@
 // lib/socials/line.ts
 
-export async function syncLINE(account: any, supabase: any) {
-  const { access_token, user_id } = account;
+import type { Account } from "./socialIndex";
+import type { SupabaseClient } from "@supabase/supabase-js";
+import type { Database } from "@/supabase/types";
+
+export async function syncLINE(
+  account: Account,
+  supabase: SupabaseClient<Database>
+) {
+  const {
+    account_id,
+    user_id,
+    access_token,
+    refresh_token,
+    expires_at,
+  } = account as unknown as {
+    account_id: string;
+    user_id: string;
+    access_token: string;
+    refresh_token?: string;
+    expires_at?: number;
+  };
 
   if (!access_token) {
     return {
       platform: "line",
       updated: false,
       error: "Missing access token",
+      account_id,
     };
   }
 
-  const refreshed = await refreshLINETokenIfNeeded(account, supabase);
+  // Standardized token refresh pattern
+  const refreshed = await refreshLINETokenIfNeeded(
+    { account_id, user_id, access_token, refresh_token, expires_at },
+    supabase
+  );
 
   const profile = await fetchLINEProfile(refreshed.access_token);
   const posts = await fetchLINETimeline(refreshed.access_token);
@@ -19,7 +43,11 @@ export async function syncLINE(account: any, supabase: any) {
   const normalizedProfile = normalizeLINEProfile(profile);
   const normalizedPosts = posts.map(normalizeLINEPost);
 
+  /* ---------------------------------
+     social_profiles
+  ----------------------------------*/
   await supabase.from("social_profiles").upsert({
+    account_id,
     user_id,
     platform: "line",
     username: normalizedProfile.username,
@@ -29,8 +57,17 @@ export async function syncLINE(account: any, supabase: any) {
     last_synced: new Date().toISOString(),
   });
 
+  /* ---------------------------------
+     social_posts
+  ----------------------------------*/
   if (normalizedPosts.length > 0) {
-    await supabase.from("social_posts").upsert(normalizedPosts);
+    await supabase.from("social_posts").upsert(
+      normalizedPosts.map((p) => ({
+        ...p,
+        user_id,
+        account_id,
+      }))
+    );
   }
 
   return {
@@ -38,16 +75,67 @@ export async function syncLINE(account: any, supabase: any) {
     updated: true,
     posts: normalizedPosts.length,
     metrics: true,
+    account_id,
   };
 }
 
-/* Helpers */
+/* -----------------------------
+   Local Types
+------------------------------*/
 
-async function refreshLINETokenIfNeeded(account: any, supabase: any) {
-  return account;
+type RawLINEProfile = {
+  displayName?: string;
+  pictureUrl?: string;
+  followers?: number;
+  following?: number;
+};
+
+type RawLINEPost = {
+  id: string;
+  text?: string;
+  media_url?: string;
+  like_count?: number;
+  comment_count?: number;
+  createdTime?: string;
+};
+
+type NormalizedProfile = {
+  username: string;
+  avatar_url: string;
+  followers: number;
+  following: number;
+};
+
+type NormalizedPost = {
+  platform: string;
+  post_id: string;
+  caption: string;
+  media_url: string;
+ likes: number;
+  comments: number;
+  posted_at: string;
+};
+
+/* -----------------------------
+   Helpers
+------------------------------*/
+
+async function refreshLINETokenIfNeeded(
+  account: {
+    account_id: string;
+    user_id: string;
+    access_token: string;
+    refresh_token?: string;
+    expires_at?: number;
+  },
+  supabase: SupabaseClient<Database>
+) {
+  return account; // placeholder logic
 }
 
-async function fetchLINEProfile(accessToken: string) {
+async function fetchLINEProfile(
+  accessToken: string
+): Promise<RawLINEProfile> {
   return {
     displayName: "Placeholder LINE User",
     pictureUrl: "",
@@ -56,7 +144,9 @@ async function fetchLINEProfile(accessToken: string) {
   };
 }
 
-async function fetchLINETimeline(accessToken: string) {
+async function fetchLINETimeline(
+  accessToken: string
+): Promise<RawLINEPost[]> {
   return [
     {
       id: "1",
@@ -69,7 +159,7 @@ async function fetchLINETimeline(accessToken: string) {
   ];
 }
 
-function normalizeLINEProfile(raw: any) {
+function normalizeLINEProfile(raw: RawLINEProfile): NormalizedProfile {
   return {
     username: raw.displayName ?? "",
     avatar_url: raw.pictureUrl ?? "",
@@ -78,7 +168,7 @@ function normalizeLINEProfile(raw: any) {
   };
 }
 
-function normalizeLINEPost(raw: any) {
+function normalizeLINEPost(raw: RawLINEPost): NormalizedPost {
   return {
     platform: "line",
     post_id: raw.id,

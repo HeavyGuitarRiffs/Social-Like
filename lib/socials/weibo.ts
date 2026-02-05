@@ -1,6 +1,9 @@
 // lib/socials/weibo.ts
 
-export async function syncWeibo(account: any, supabase: any) {
+export async function syncWeibo(
+  account: WeiboAccount,
+  supabase: SupabaseClientLike
+): Promise<SyncResult> {
   const { access_token, user_id } = account;
 
   if (!access_token) {
@@ -30,7 +33,12 @@ export async function syncWeibo(account: any, supabase: any) {
   });
 
   if (normalizedPosts.length > 0) {
-    await supabase.from("social_posts").upsert(normalizedPosts);
+    await supabase.from("social_posts").upsert(
+      normalizedPosts.map((p) => ({
+        ...p,
+        user_id,
+      }))
+    );
   }
 
   return {
@@ -41,13 +49,76 @@ export async function syncWeibo(account: any, supabase: any) {
   };
 }
 
-/* Helpers */
+/* -----------------------------
+   Local Types
+------------------------------*/
 
-async function refreshWeiboTokenIfNeeded(account: any, supabase: any) {
-  return account;
+type WeiboAccount = {
+  access_token: string;
+  user_id: string;
+};
+
+type RawWeiboProfile = {
+  screen_name?: string;
+  avatar_hd?: string;
+  followers_count?: number;
+  friends_count?: number;
+};
+
+type RawWeiboPost = {
+  id: string;
+  text?: string;
+  pic_url?: string;
+  attitudes_count?: number;
+  comments_count?: number;
+  created_at?: string;
+};
+
+type NormalizedProfile = {
+  username: string;
+  avatar_url: string;
+  followers: number;
+  following: number;
+};
+
+type NormalizedPost = {
+  platform: string;
+  post_id: string;
+  caption: string;
+  media_url: string;
+  likes: number;
+  comments: number;
+  posted_at: string;
+};
+
+type SupabaseClientLike = {
+  from: (table: string) => {
+    upsert: (values: unknown) => Promise<unknown>;
+  };
+};
+
+type SyncResult = {
+  platform: string;
+  updated: boolean;
+  posts?: number;
+  metrics?: boolean;
+  error?: string;
+};
+
+/* -----------------------------
+   Helpers
+------------------------------*/
+
+async function refreshWeiboTokenIfNeeded(
+  account: WeiboAccount,
+  supabase: SupabaseClientLike
+): Promise<WeiboAccount> {
+  return account; // placeholder logic
 }
 
-async function fetchWeiboProfile(accessToken: string) {
+async function fetchWeiboProfile(
+  accessToken: string
+): Promise<RawWeiboProfile> {
   return {
     screen_name: "Placeholder Weibo User",
     avatar_hd: "",
@@ -56,7 +127,9 @@ async function fetchWeiboProfile(accessToken: string) {
   };
 }
 
-async function fetchWeiboPosts(accessToken: string) {
+async function fetchWeiboPosts(
+  accessToken: string
+): Promise<RawWeiboPost[]> {
   return [
     {
       id: "1",
@@ -69,7 +142,9 @@ async function fetchWeiboPosts(accessToken: string) {
   ];
 }
 
-function normalizeWeiboProfile(raw: any) {
+function normalizeWeiboProfile(
+  raw: RawWeiboProfile
+): NormalizedProfile {
   return {
     username: raw.screen_name ?? "",
     avatar_url: raw.avatar_hd ?? "",
@@ -78,7 +153,9 @@ function normalizeWeiboProfile(raw: any) {
   };
 }
 
-function normalizeWeiboPost(raw: any) {
+function normalizeWeiboPost(
+  raw: RawWeiboPost
+): NormalizedPost {
   return {
     platform: "weibo",
     post_id: raw.id,

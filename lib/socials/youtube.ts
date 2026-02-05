@@ -1,7 +1,17 @@
 // lib/socials/youtube.ts
 
-export async function syncYouTube(account: any, supabase: any) {
-  const { access_token, refresh_token, user_id } = account;
+import type { Account } from "./socialIndex";
+import type { SupabaseClient } from "@supabase/supabase-js";
+import type { Database } from "@/supabase/types";
+
+export async function syncYouTube(
+  account: Account,
+  supabase: SupabaseClient<Database>
+) {
+  const { access_token, user_id } = account as unknown as {
+    access_token: string;
+    user_id: string;
+  };
 
   if (!access_token) {
     return {
@@ -11,7 +21,10 @@ export async function syncYouTube(account: any, supabase: any) {
     };
   }
 
-  const refreshed = await refreshYouTubeTokenIfNeeded(account, supabase);
+  const refreshed = await refreshYouTubeTokenIfNeeded(
+    account as unknown as YouTubeAccount,
+    supabase
+  );
 
   const profile = await fetchYouTubeProfile(refreshed.access_token);
   const posts = await fetchYouTubeVideos(refreshed.access_token);
@@ -30,7 +43,12 @@ export async function syncYouTube(account: any, supabase: any) {
   });
 
   if (normalizedPosts.length > 0) {
-    await supabase.from("social_posts").upsert(normalizedPosts);
+    await supabase.from("social_posts").upsert(
+      normalizedPosts.map((p) => ({
+        ...p,
+        user_id,
+      }))
+    );
   }
 
   return {
@@ -41,13 +59,61 @@ export async function syncYouTube(account: any, supabase: any) {
   };
 }
 
-/* Helper functions */
+/* -----------------------------
+   Local Types
+------------------------------*/
 
-async function refreshYouTubeTokenIfNeeded(account: any, supabase: any) {
-  return account;
+type YouTubeAccount = {
+  access_token: string;
+  refresh_token?: string;
+  user_id: string;
+};
+
+type RawYouTubeProfile = {
+  title?: string;
+  thumbnail?: string;
+  subscriberCount?: number;
+};
+
+type RawYouTubeVideo = {
+  id: string;
+  title?: string;
+  thumbnail?: string;
+  likeCount?: number;
+  commentCount?: number;
+  publishedAt?: string;
+};
+
+type NormalizedProfile = {
+  username: string;
+  avatar_url: string;
+  subscribers: number;
+};
+
+type NormalizedPost = {
+  platform: string;
+  post_id: string;
+  caption: string;
+  media_url: string;
+  likes: number;
+  comments: number;
+  posted_at: string;
+};
+
+/* -----------------------------
+   Helpers
+------------------------------*/
+
+async function refreshYouTubeTokenIfNeeded(
+  account: YouTubeAccount,
+  supabase: SupabaseClient<Database>
+): Promise<YouTubeAccount> {
+  return account; // placeholder logic
 }
 
-async function fetchYouTubeProfile(accessToken: string) {
+async function fetchYouTubeProfile(
+  accessToken: string
+): Promise<RawYouTubeProfile> {
   return {
     title: "Placeholder Channel",
     thumbnail: "",
@@ -55,7 +121,9 @@ async function fetchYouTubeProfile(accessToken: string) {
   };
 }
 
-async function fetchYouTubeVideos(accessToken: string) {
+async function fetchYouTubeVideos(
+  accessToken: string
+): Promise<RawYouTubeVideo[]> {
   return [
     {
       id: "1",
@@ -68,7 +136,9 @@ async function fetchYouTubeVideos(accessToken: string) {
   ];
 }
 
-function normalizeYouTubeProfile(raw: any) {
+function normalizeYouTubeProfile(
+  raw: RawYouTubeProfile
+): NormalizedProfile {
   return {
     username: raw.title ?? "",
     avatar_url: raw.thumbnail ?? "",
@@ -76,7 +146,9 @@ function normalizeYouTubeProfile(raw: any) {
   };
 }
 
-function normalizeYouTubeVideo(raw: any) {
+function normalizeYouTubeVideo(
+  raw: RawYouTubeVideo
+): NormalizedPost {
   return {
     platform: "youtube",
     post_id: raw.id,

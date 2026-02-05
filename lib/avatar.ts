@@ -1,3 +1,5 @@
+//lib\avatar.ts
+
 export const AVATAR_STORAGE_KEY = "qubit_avatar"
 
 export function saveAvatar(base64: string) {

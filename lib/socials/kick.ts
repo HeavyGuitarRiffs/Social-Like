@@ -1,7 +1,17 @@
 // lib/socials/kick.ts
 
-export async function syncKick(account: any, supabase: any) {
-  const { access_token, user_id } = account;
+import type { Account } from "./socialIndex";
+import type { SupabaseClient } from "@supabase/supabase-js";
+import type { Database } from "@/supabase/types";
+
+export async function syncKick(
+  account: Account,
+  supabase: SupabaseClient<Database>
+) {
+  const { access_token, user_id } = account as unknown as {
+    access_token: string;
+    user_id: string;
+  };
 
   if (!access_token) {
     return {
@@ -11,7 +21,10 @@ export async function syncKick(account: any, supabase: any) {
     };
   }
 
-  const refreshed = await refreshKickTokenIfNeeded(account, supabase);
+  const refreshed = await refreshKickTokenIfNeeded(
+    account as unknown as KickAccount,
+    supabase
+  );
 
   const profile = await fetchKickProfile(refreshed.access_token);
   const posts = await fetchKickStreams(refreshed.access_token);
@@ -30,7 +43,12 @@ export async function syncKick(account: any, supabase: any) {
   });
 
   if (normalizedPosts.length > 0) {
-    await supabase.from("social_posts").upsert(normalizedPosts);
+    await supabase.from("social_posts").upsert(
+      normalizedPosts.map((p) => ({
+        ...p,
+        user_id,
+      }))
+    );
   }
 
   return {
@@ -41,13 +59,59 @@ export async function syncKick(account: any, supabase: any) {
   };
 }
 
-/* Helpers */
+/* -----------------------------
+   Local Types
+------------------------------*/
 
-async function refreshKickTokenIfNeeded(account: any, supabase: any) {
-  return account;
+type KickAccount = {
+  access_token: string;
+  user_id: string;
+};
+
+type RawKickProfile = {
+  username?: string;
+  avatar?: string;
+  follower_count?: number;
+};
+
+type RawKickStream = {
+  id: string;
+  title?: string;
+  thumbnail_url?: string;
+  viewer_count?: number;
+  created_at?: string;
+};
+
+type NormalizedProfile = {
+  username: string;
+  avatar_url: string;
+  followers: number;
+};
+
+type NormalizedPost = {
+  platform: string;
+  post_id: string;
+  caption: string;
+  media_url: string;
+  likes: number;
+  comments: number;
+  posted_at: string;
+};
+
+/* -----------------------------
+   Helpers
+------------------------------*/
+
+async function refreshKickTokenIfNeeded(
+  account: KickAccount,
+  supabase: SupabaseClient<Database>
+): Promise<KickAccount> {
+  return account; // placeholder logic
 }
 
-async function fetchKickProfile(accessToken: string) {
+async function fetchKickProfile(
+  accessToken: string
+): Promise<RawKickProfile> {
   return {
     username: "Placeholder Streamer",
     avatar: "",
@@ -55,7 +119,9 @@ async function fetchKickProfile(accessToken: string) {
   };
 }
 
-async function fetchKickStreams(accessToken: string) {
+async function fetchKickStreams(
+  accessToken: string
+): Promise<RawKickStream[]> {
   return [
     {
       id: "1",
@@ -67,7 +133,9 @@ async function fetchKickStreams(accessToken: string) {
   ];
 }
 
-function normalizeKickProfile(raw: any) {
+function normalizeKickProfile(
+  raw: RawKickProfile
+): NormalizedProfile {
   return {
     username: raw.username ?? "",
     avatar_url: raw.avatar ?? "",
@@ -75,7 +143,9 @@ function normalizeKickProfile(raw: any) {
   };
 }
 
-function normalizeKickStream(raw: any) {
+function normalizeKickStream(
+  raw: RawKickStream
+): NormalizedPost {
   return {
     platform: "kick",
     post_id: raw.id,

@@ -1,3 +1,5 @@
+//lib\profile.ts
+
 export type UserProfile = {
   id?: string // later from auth
   displayName: string

@@ -1,17 +1,41 @@
 // lib/socials/producthunt.ts
 
-export async function syncProductHunt(account: any, supabase: any) {
-  const { access_token, user_id } = account;
+import type { Account } from "./socialIndex";
+import type { SupabaseClient } from "@supabase/supabase-js";
+import type { Database } from "@/supabase/types";
+
+export async function syncProductHunt(
+  account: Account,
+  supabase: SupabaseClient<Database>
+) {
+  const {
+    account_id,
+    user_id,
+    access_token,
+    refresh_token,
+    expires_at,
+  } = account as unknown as {
+    account_id: string;
+    user_id: string;
+    access_token: string;
+    refresh_token?: string;
+    expires_at?: number;
+  };
 
   if (!access_token) {
     return {
       platform: "producthunt",
       updated: false,
       error: "Missing access token",
+      account_id,
     };
   }
 
-  const refreshed = await refreshProductHuntTokenIfNeeded(account, supabase);
+  // Product Hunt refresh placeholder (kept consistent with universal pattern)
+  const refreshed = await refreshProductHuntTokenIfNeeded(
+    { account_id, user_id, access_token, refresh_token, expires_at },
+    supabase
+  );
 
   const profile = await fetchProductHuntProfile(refreshed.access_token);
   const posts = await fetchProductHuntPosts(refreshed.access_token);
@@ -19,18 +43,31 @@ export async function syncProductHunt(account: any, supabase: any) {
   const normalizedProfile = normalizeProductHuntProfile(profile);
   const normalizedPosts = posts.map(normalizeProductHuntPost);
 
+  /* ---------------------------------
+     social_profiles
+  ----------------------------------*/
   await supabase.from("social_profiles").upsert({
+    account_id,
     user_id,
     platform: "producthunt",
     username: normalizedProfile.username,
     avatar_url: normalizedProfile.avatar_url,
     followers: normalizedProfile.followers,
-    following: 0,
+    following: 0, // Product Hunt does not expose following count
     last_synced: new Date().toISOString(),
   });
 
+  /* ---------------------------------
+     social_posts
+  ----------------------------------*/
   if (normalizedPosts.length > 0) {
-    await supabase.from("social_posts").upsert(normalizedPosts);
+    await supabase.from("social_posts").upsert(
+      normalizedPosts.map((p) => ({
+        ...p,
+        user_id,
+        account_id,
+      }))
+    );
   }
 
   return {
@@ -38,16 +75,65 @@ export async function syncProductHunt(account: any, supabase: any) {
     updated: true,
     posts: normalizedPosts.length,
     metrics: true,
+    account_id,
   };
 }
 
-/* Helpers */
+/* -----------------------------
+   Local Types
+------------------------------*/
 
-async function refreshProductHuntTokenIfNeeded(account: any, supabase: any) {
-  return account;
+type RawProductHuntProfile = {
+  name?: string;
+  avatar?: string;
+  followers_count?: number;
+};
+
+type RawProductHuntPost = {
+  id: string;
+  name?: string;
+  thumbnail?: { url?: string };
+  votes_count?: number;
+  comments_count?: number;
+  created_at?: string;
+};
+
+type NormalizedProfile = {
+  username: string;
+  avatar_url: string;
+  followers: number;
+};
+
+type NormalizedPost = {
+  platform: string;
+  post_id: string;
+  caption: string;
+  media_url: string;
+  likes: number;
+  comments: number;
+  posted_at: string;
+};
+
+/* -----------------------------
+   Helpers
+------------------------------*/
+
+async function refreshProductHuntTokenIfNeeded(
+  account: {
+    account_id: string;
+    user_id: string;
+    access_token: string;
+    refresh_token?: string;
+    expires_at?: number;
+  },
+  supabase: SupabaseClient<Database>
+) {
+  return account; // placeholder logic
 }
 
-async function fetchProductHuntProfile(accessToken: string) {
+async function fetchProductHuntProfile(
+  accessToken: string
+): Promise<RawProductHuntProfile> {
   return {
     name: "Placeholder Maker",
     avatar: "",
@@ -55,7 +141,9 @@ async function fetchProductHuntProfile(accessToken: string) {
   };
 }
 
-async function fetchProductHuntPosts(accessToken: string) {
+async function fetchProductHuntPosts(
+  accessToken: string
+): Promise<RawProductHuntPost[]> {
   return [
     {
       id: "1",
@@ -68,7 +156,9 @@ async function fetchProductHuntPosts(accessToken: string) {
   ];
 }
 
-function normalizeProductHuntProfile(raw: any) {
+function normalizeProductHuntProfile(
+  raw: RawProductHuntProfile
+): NormalizedProfile {
   return {
     username: raw.name ?? "",
     avatar_url: raw.avatar ?? "",
@@ -76,7 +166,9 @@ function normalizeProductHuntProfile(raw: any) {
   };
 }
 
-function normalizeProductHuntPost(raw: any) {
+function normalizeProductHuntPost(
+  raw: RawProductHuntPost
+): NormalizedPost {
   return {
     platform: "producthunt",
     post_id: raw.id,

@@ -1,17 +1,41 @@
 // lib/socials/linkedin.ts
 
-export async function syncLinkedIn(account: any, supabase: any) {
-  const { access_token, refresh_token, user_id } = account;
+import type { Account } from "./socialIndex";
+import type { SupabaseClient } from "@supabase/supabase-js";
+import type { Database } from "@/supabase/types";
+
+export async function syncLinkedIn(
+  account: Account,
+  supabase: SupabaseClient<Database>
+) {
+  const {
+    account_id,
+    user_id,
+    access_token,
+    refresh_token,
+    expires_at,
+  } = account as unknown as {
+    account_id: string;
+    user_id: string;
+    access_token: string;
+    refresh_token?: string;
+    expires_at?: number;
+  };
 
   if (!access_token) {
     return {
       platform: "linkedin",
       updated: false,
       error: "Missing access token",
+      account_id,
     };
   }
 
-  const refreshed = await refreshLinkedInTokenIfNeeded(account, supabase);
+  // Standardized token refresh pattern
+  const refreshed = await refreshLinkedInTokenIfNeeded(
+    { account_id, user_id, access_token, refresh_token, expires_at },
+    supabase
+  );
 
   const profile = await fetchLinkedInProfile(refreshed.access_token);
   const posts = await fetchLinkedInPosts(refreshed.access_token);
@@ -19,7 +43,11 @@ export async function syncLinkedIn(account: any, supabase: any) {
   const normalizedProfile = normalizeLinkedInProfile(profile);
   const normalizedPosts = posts.map(normalizeLinkedInPost);
 
+  /* ---------------------------------
+     social_profiles
+  ----------------------------------*/
   await supabase.from("social_profiles").upsert({
+    account_id,
     user_id,
     platform: "linkedin",
     username: normalizedProfile.username,
@@ -29,8 +57,17 @@ export async function syncLinkedIn(account: any, supabase: any) {
     last_synced: new Date().toISOString(),
   });
 
+  /* ---------------------------------
+     social_posts
+  ----------------------------------*/
   if (normalizedPosts.length > 0) {
-    await supabase.from("social_posts").upsert(normalizedPosts);
+    await supabase.from("social_posts").upsert(
+      normalizedPosts.map((p) => ({
+        ...p,
+        user_id,
+        account_id,
+      }))
+    );
   }
 
   return {
@@ -38,16 +75,68 @@ export async function syncLinkedIn(account: any, supabase: any) {
     updated: true,
     posts: normalizedPosts.length,
     metrics: true,
+    account_id,
   };
 }
 
-/* Helper functions */
+/* -----------------------------
+   Local Types
+------------------------------*/
 
-async function refreshLinkedInTokenIfNeeded(account: any, supabase: any) {
-  return account;
+type RawLinkedInProfile = {
+  localizedFirstName?: string;
+  localizedLastName?: string;
+  profilePicture?: string;
+  followerCount?: number;
+  followingCount?: number;
+};
+
+type RawLinkedInPost = {
+  id: string;
+  text?: string;
+  media_url?: string;
+  like_count?: number;
+  comment_count?: number;
+  created_at?: string;
+};
+
+type NormalizedProfile = {
+  username: string;
+  avatar_url: string;
+  followers: number;
+  following: number;
+};
+
+type NormalizedPost = {
+  platform: string;
+  post_id: string;
+  caption: string;
+  media_url: string;
+  likes: number;
+  comments: number;
+  posted_at: string;
+};
+
+/* -----------------------------
+   Helpers
+------------------------------*/
+
+async function refreshLinkedInTokenIfNeeded(
+  account: {
+    account_id: string;
+    user_id: string;
+    access_token: string;
+    refresh_token?: string;
+    expires_at?: number;
+  },
+  supabase: SupabaseClient<Database>
+) {
+  return account; // placeholder logic
 }
 
-async function fetchLinkedInProfile(accessToken: string) {
+async function fetchLinkedInProfile(
+  accessToken: string
+): Promise<RawLinkedInProfile> {
   return {
     localizedFirstName: "Placeholder",
     localizedLastName: "User",
@@ -57,7 +146,9 @@ async function fetchLinkedInProfile(accessToken: string) {
   };
 }
 
-async function fetchLinkedInPosts(accessToken: string) {
+async function fetchLinkedInPosts(
+  accessToken: string
+): Promise<RawLinkedInPost[]> {
   return [
     {
       id: "1",
@@ -70,7 +161,9 @@ async function fetchLinkedInPosts(accessToken: string) {
   ];
 }
 
-function normalizeLinkedInProfile(raw: any) {
+function normalizeLinkedInProfile(
+  raw: RawLinkedInProfile
+): NormalizedProfile {
   return {
     username: `${raw.localizedFirstName ?? ""} ${raw.localizedLastName ?? ""}`.trim(),
     avatar_url: raw.profilePicture ?? "",
@@ -79,7 +172,9 @@ function normalizeLinkedInProfile(raw: any) {
   };
 }
 
-function normalizeLinkedInPost(raw: any) {
+function normalizeLinkedInPost(
+  raw: RawLinkedInPost
+): NormalizedPost {
   return {
     platform: "linkedin",
     post_id: raw.id,

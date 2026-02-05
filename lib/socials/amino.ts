@@ -1,17 +1,52 @@
 // lib/socials/amino.ts
 
-export async function syncAmino(account: any, supabase: any) {
+import type { SupabaseClient } from "@supabase/supabase-js";
+import type { Database } from "@/supabase/types";
+
+type AminoAccount = {
+  access_token: string | null;
+  user_id: string;
+};
+
+type AminoProfile = {
+  username: string;
+  avatar_url: string;
+  followers: number;
+  following: number;
+};
+
+type AminoPost = {
+  id: string;
+  title: string;
+  media_url: string;
+  likes: number;
+  comments: number;
+  created_at: string;
+};
+
+export async function syncAmino(
+  account: AminoAccount,
+  supabase: SupabaseClient<Database>
+) {
   const { access_token, user_id } = account;
 
   if (!access_token) {
-    return { platform: "amino", updated: false, error: "Missing access token" };
+    return {
+      platform: "amino",
+      updated: false,
+      error: "Missing access token"
+    };
   }
 
   const profile = await fetchAminoProfile(access_token);
   const posts = await fetchAminoPosts(access_token);
 
   const normalizedProfile = normalizeAminoProfile(profile);
-  const normalizedPosts = posts.map(normalizeAminoPost);
+
+  const normalizedPosts = posts.map((p) => ({
+    user_id,
+    ...normalizeAminoPost(p)
+  }));
 
   await supabase.from("social_profiles").upsert({
     user_id,
@@ -27,12 +62,19 @@ export async function syncAmino(account: any, supabase: any) {
     await supabase.from("social_posts").upsert(normalizedPosts);
   }
 
-  return { platform: "amino", updated: true, posts: normalizedPosts.length, metrics: true };
+  return {
+    platform: "amino",
+    updated: true,
+    posts: normalizedPosts.length,
+    metrics: true
+  };
 }
 
+/* -------------------------------------------------- */
 /* Helpers */
+/* -------------------------------------------------- */
 
-async function fetchAminoProfile(accessToken: string) {
+async function fetchAminoProfile(accessToken: string): Promise<AminoProfile> {
   return {
     username: "Placeholder Amino User",
     avatar_url: "",
@@ -41,7 +83,7 @@ async function fetchAminoProfile(accessToken: string) {
   };
 }
 
-async function fetchAminoPosts(accessToken: string) {
+async function fetchAminoPosts(accessToken: string): Promise<AminoPost[]> {
   return [
     {
       id: "1",
@@ -54,7 +96,7 @@ async function fetchAminoPosts(accessToken: string) {
   ];
 }
 
-function normalizeAminoProfile(raw: any) {
+function normalizeAminoProfile(raw: AminoProfile) {
   return {
     username: raw.username ?? "",
     avatar_url: raw.avatar_url ?? "",
@@ -63,7 +105,7 @@ function normalizeAminoProfile(raw: any) {
   };
 }
 
-function normalizeAminoPost(raw: any) {
+function normalizeAminoPost(raw: AminoPost) {
   return {
     platform: "amino",
     post_id: raw.id,

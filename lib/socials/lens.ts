@@ -1,10 +1,24 @@
 // lib/socials/lens.ts
 
-export async function syncLens(account: any, supabase: any) {
-  const { wallet_address, user_id } = account;
+import type { Account } from "./socialIndex";
+import type { SupabaseClient } from "@supabase/supabase-js";
+import type { Database } from "@/supabase/types";
+
+export async function syncLens(
+  account: Account,
+  supabase: SupabaseClient<Database>
+) {
+  const { wallet_address, user_id } = account as unknown as {
+    wallet_address: string;
+    user_id: string;
+  };
 
   if (!wallet_address) {
-    return { platform: "lens", updated: false, error: "Missing wallet address" };
+    return {
+      platform: "lens",
+      updated: false,
+      error: "Missing wallet address",
+    };
   }
 
   const profile = await fetchLensProfile(wallet_address);
@@ -24,15 +38,66 @@ export async function syncLens(account: any, supabase: any) {
   });
 
   if (normalizedPosts.length > 0) {
-    await supabase.from("social_posts").upsert(normalizedPosts);
+    await supabase.from("social_posts").upsert(
+      normalizedPosts.map((p) => ({
+        ...p,
+        user_id,
+      }))
+    );
   }
 
-  return { platform: "lens", updated: true, posts: normalizedPosts.length, metrics: true };
+  return {
+    platform: "lens",
+    updated: true,
+    posts: normalizedPosts.length,
+    metrics: true,
+  };
 }
 
-/* Helpers */
+/* -----------------------------
+   Local Types
+------------------------------*/
 
-async function fetchLensProfile(wallet: string) {
+type RawLensProfile = {
+  handle?: string;
+  avatar?: string;
+  followers?: number;
+  following?: number;
+};
+
+type RawLensPublication = {
+  id: string;
+  content?: string;
+  media_url?: string;
+  likes?: number;
+  comments?: number;
+  created_at?: string;
+};
+
+type NormalizedProfile = {
+  username: string;
+  avatar_url: string;
+  followers: number;
+  following: number;
+};
+
+type NormalizedPost = {
+  platform: string;
+  post_id: string;
+  caption: string;
+  media_url: string;
+  likes: number;
+  comments: number;
+  posted_at: string;
+};
+
+/* -----------------------------
+   Placeholder Fetchers
+------------------------------*/
+
+async function fetchLensProfile(
+  wallet: string
+): Promise<RawLensProfile> {
   return {
     handle: "placeholder.lens",
     avatar: "",
@@ -41,7 +106,9 @@ async function fetchLensProfile(wallet: string) {
   };
 }
 
-async function fetchLensPublications(wallet: string) {
+async function fetchLensPublications(
+  wallet: string
+): Promise<RawLensPublication[]> {
   return [
     {
       id: "1",
@@ -54,7 +121,13 @@ async function fetchLensPublications(wallet: string) {
   ];
 }
 
-function normalizeLensProfile(raw: any) {
+/* -----------------------------
+   Normalizers
+------------------------------*/
+
+function normalizeLensProfile(
+  raw: RawLensProfile
+): NormalizedProfile {
   return {
     username: raw.handle ?? "",
     avatar_url: raw.avatar ?? "",
@@ -63,7 +136,9 @@ function normalizeLensProfile(raw: any) {
   };
 }
 
-function normalizeLensPublication(raw: any) {
+function normalizeLensPublication(
+  raw: RawLensPublication
+): NormalizedPost {
   return {
     platform: "lens",
     post_id: raw.id,

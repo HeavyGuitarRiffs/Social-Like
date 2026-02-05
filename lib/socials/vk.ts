@@ -1,17 +1,36 @@
 // lib/socials/vk.ts
 
-export async function syncVK(account: any, supabase: any) {
-  const { access_token, user_id } = account;
+import type { Account } from "./socialIndex";
+import type { SupabaseClient } from "@supabase/supabase-js";
+import type { Database } from "@/supabase/types";
+
+export async function syncVK(
+  account: Account,
+  supabase: SupabaseClient<Database>
+) {
+  const {
+    account_id,
+    user_id,
+    access_token,
+  } = account as unknown as {
+    account_id: string;
+    user_id: string;
+    access_token: string;
+  };
 
   if (!access_token) {
     return {
       platform: "vk",
       updated: false,
       error: "Missing access token",
+      account_id,
     };
   }
 
-  const refreshed = await refreshVKTokenIfNeeded(account, supabase);
+  const refreshed = await refreshVKTokenIfNeeded(
+    { account_id, user_id, access_token },
+    supabase
+  );
 
   const profile = await fetchVKProfile(refreshed.access_token);
   const posts = await fetchVKPosts(refreshed.access_token);
@@ -19,7 +38,11 @@ export async function syncVK(account: any, supabase: any) {
   const normalizedProfile = normalizeVKProfile(profile);
   const normalizedPosts = posts.map(normalizeVKPost);
 
+  /* ---------------------------------
+     social_profiles
+  ----------------------------------*/
   await supabase.from("social_profiles").upsert({
+    account_id,
     user_id,
     platform: "vk",
     username: normalizedProfile.username,
@@ -29,8 +52,17 @@ export async function syncVK(account: any, supabase: any) {
     last_synced: new Date().toISOString(),
   });
 
+  /* ---------------------------------
+     social_posts
+  ----------------------------------*/
   if (normalizedPosts.length > 0) {
-    await supabase.from("social_posts").upsert(normalizedPosts);
+    await supabase.from("social_posts").upsert(
+      normalizedPosts.map((p) => ({
+        ...p,
+        user_id,
+        account_id,
+      }))
+    );
   }
 
   return {
@@ -38,16 +70,66 @@ export async function syncVK(account: any, supabase: any) {
     updated: true,
     posts: normalizedPosts.length,
     metrics: true,
+    account_id,
   };
 }
 
-/* Helpers */
+/* -----------------------------
+   Local Types
+------------------------------*/
 
-async function refreshVKTokenIfNeeded(account: any, supabase: any) {
-  return account;
+type RawVKProfile = {
+  first_name?: string;
+  last_name?: string;
+  photo_max?: string;
+  followers_count?: number;
+  friends_count?: number;
+};
+
+type RawVKPost = {
+  id: string;
+  text?: string;
+  image_url?: string;
+  likes?: { count?: number };
+  comments?: { count?: number };
+  date: number; // UNIX timestamp
+};
+
+type NormalizedProfile = {
+  username: string;
+  avatar_url: string;
+  followers: number;
+  following: number;
+};
+
+type NormalizedPost = {
+  platform: string;
+  post_id: string;
+  caption: string;
+  media_url: string;
+  likes: number;
+  comments: number;
+  posted_at: string;
+};
+
+/* -----------------------------
+   Helpers
+------------------------------*/
+
+async function refreshVKTokenIfNeeded(
+  account: {
+    account_id: string;
+    user_id: string;
+    access_token: string;
+  },
+  supabase: SupabaseClient<Database>
+) {
+  return account; // placeholder logic
 }
 
-async function fetchVKProfile(accessToken: string) {
+async function fetchVKProfile(
+  accessToken: string
+): Promise<RawVKProfile> {
   return {
     first_name: "Placeholder",
     last_name: "User",
@@ -57,7 +139,9 @@ async function fetchVKProfile(accessToken: string) {
   };
 }
 
-async function fetchVKPosts(accessToken: string) {
+async function fetchVKPosts(
+  accessToken: string
+): Promise<RawVKPost[]> {
   return [
     {
       id: "1",
@@ -70,7 +154,9 @@ async function fetchVKPosts(accessToken: string) {
   ];
 }
 
-function normalizeVKProfile(raw: any) {
+function normalizeVKProfile(
+  raw: RawVKProfile
+): NormalizedProfile {
   return {
     username: `${raw.first_name ?? ""} ${raw.last_name ?? ""}`.trim(),
     avatar_url: raw.photo_max ?? "",
@@ -79,7 +165,9 @@ function normalizeVKProfile(raw: any) {
   };
 }
 
-function normalizeVKPost(raw: any) {
+function normalizeVKPost(
+  raw: RawVKPost
+): NormalizedPost {
   return {
     platform: "vk",
     post_id: raw.id,

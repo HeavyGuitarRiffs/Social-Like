@@ -1,6 +1,13 @@
 // lib/socials/discord.ts
 
-export async function syncDiscord(account: any, supabase: any) {
+import type { Account } from "./socialIndex";                 // <-- UNIVERSAL TYPE
+import type { SupabaseClient } from "@supabase/supabase-js";
+import type { Database } from "@/supabase/types";
+
+export async function syncDiscord(
+  account: Account,                                           // <-- FIXED
+  supabase: SupabaseClient<Database>                          // <-- FIXED
+) {
   const { access_token, user_id } = account;
 
   if (!access_token) {
@@ -11,7 +18,10 @@ export async function syncDiscord(account: any, supabase: any) {
     };
   }
 
-  const refreshed = await refreshDiscordTokenIfNeeded(account, supabase);
+  const refreshed = await refreshDiscordTokenIfNeeded(
+    account as unknown as DiscordAccount,                     // <-- Discord-specific fields
+    supabase
+  );
 
   const profile = await fetchDiscordProfile(refreshed.access_token);
   const posts = await fetchDiscordActivity(refreshed.access_token);
@@ -30,7 +40,12 @@ export async function syncDiscord(account: any, supabase: any) {
   });
 
   if (normalizedPosts.length > 0) {
-    await supabase.from("social_posts").upsert(normalizedPosts);
+    await supabase.from("social_posts").upsert(
+      normalizedPosts.map((p) => ({
+        ...p,
+        user_id,
+      }))
+    );
   }
 
   return {
@@ -41,13 +56,57 @@ export async function syncDiscord(account: any, supabase: any) {
   };
 }
 
-/* Helpers */
+/* -----------------------------
+   Local Types
+------------------------------*/
 
-async function refreshDiscordTokenIfNeeded(account: any, supabase: any) {
-  return account;
+type DiscordAccount = {
+  access_token: string;
+  user_id: string;
+};
+
+type RawDiscordProfile = {
+  username?: string;
+  avatar?: string;
+  followers?: number;
+};
+
+type RawDiscordPost = {
+  id: string;
+  content?: string;
+  created_at?: string;
+};
+
+type NormalizedProfile = {
+  username: string;
+  avatar_url: string;
+  followers: number;
+};
+
+type NormalizedPost = {
+  platform: string;
+  post_id: string;
+  caption: string;
+  media_url: string;
+  likes: number;
+  comments: number;
+  posted_at: string;
+};
+
+/* -----------------------------
+   Helpers
+------------------------------*/
+
+async function refreshDiscordTokenIfNeeded(
+  account: DiscordAccount,
+  supabase: SupabaseClient<Database>
+): Promise<DiscordAccount> {
+  return account; // placeholder logic
 }
 
-async function fetchDiscordProfile(accessToken: string) {
+async function fetchDiscordProfile(
+  accessToken: string
+): Promise<RawDiscordProfile> {
   return {
     username: "placeholder",
     avatar: "",
@@ -55,7 +114,9 @@ async function fetchDiscordProfile(accessToken: string) {
   };
 }
 
-async function fetchDiscordActivity(accessToken: string) {
+async function fetchDiscordActivity(
+  accessToken: string
+): Promise<RawDiscordPost[]> {
   return [
     {
       id: "1",
@@ -65,7 +126,9 @@ async function fetchDiscordActivity(accessToken: string) {
   ];
 }
 
-function normalizeDiscordProfile(raw: any) {
+function normalizeDiscordProfile(
+  raw: RawDiscordProfile
+): NormalizedProfile {
   return {
     username: raw.username ?? "",
     avatar_url: raw.avatar ?? "",
@@ -73,7 +136,9 @@ function normalizeDiscordProfile(raw: any) {
   };
 }
 
-function normalizeDiscordActivity(raw: any) {
+function normalizeDiscordActivity(
+  raw: RawDiscordPost
+): NormalizedPost {
   return {
     platform: "discord",
     post_id: raw.id,

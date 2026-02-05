@@ -1,6 +1,13 @@
 // lib/socials/bilibili.ts
 
-export async function syncBilibili(account: any, supabase: any) {
+import type { Account } from "./socialIndex";                 // <-- UNIVERSAL TYPE
+import type { SupabaseClient } from "@supabase/supabase-js";
+import type { Database } from "@/supabase/types";
+
+export async function syncBilibili(
+  account: Account,                                           // <-- FIXED
+  supabase: SupabaseClient<Database>                          // <-- FIXED
+) {
   const { access_token, user_id } = account;
 
   if (!access_token) {
@@ -11,7 +18,10 @@ export async function syncBilibili(account: any, supabase: any) {
     };
   }
 
-  const refreshed = await refreshBilibiliTokenIfNeeded(account, supabase);
+  const refreshed = await refreshBilibiliTokenIfNeeded(
+    account as unknown as BilibiliAccount,                    // <-- Behance-style cast
+    supabase
+  );
 
   const profile = await fetchBilibiliProfile(refreshed.access_token);
   const posts = await fetchBilibiliVideos(refreshed.access_token);
@@ -30,7 +40,12 @@ export async function syncBilibili(account: any, supabase: any) {
   });
 
   if (normalizedPosts.length > 0) {
-    await supabase.from("social_posts").upsert(normalizedPosts);
+    await supabase.from("social_posts").upsert(
+      normalizedPosts.map((p) => ({
+        ...p,
+        user_id,
+      }))
+    );
   }
 
   return {
@@ -41,13 +56,62 @@ export async function syncBilibili(account: any, supabase: any) {
   };
 }
 
-/* Helpers */
+/* -----------------------------
+   Local Types
+------------------------------*/
 
-async function refreshBilibiliTokenIfNeeded(account: any, supabase: any) {
-  return account;
+type BilibiliAccount = {
+  access_token: string;
+  user_id: string;
+};
+
+type RawBilibiliProfile = {
+  name?: string;
+  face?: string;
+  follower?: number;
+  following?: number;
+};
+
+type RawBilibiliPost = {
+  id: string;
+  title?: string;
+  pic?: string;
+  like?: number;
+  reply?: number;
+  created_at?: string;
+};
+
+type NormalizedProfile = {
+  username: string;
+  avatar_url: string;
+  followers: number;
+  following: number;
+};
+
+type NormalizedPost = {
+  platform: string;
+  post_id: string;
+  caption: string;
+  media_url: string;
+  likes: number;
+  comments: number;
+  posted_at: string;
+};
+
+/* -----------------------------
+   Helpers
+------------------------------*/
+
+async function refreshBilibiliTokenIfNeeded(
+  account: BilibiliAccount,
+  supabase: SupabaseClient<Database>
+): Promise<BilibiliAccount> {
+  return account; // placeholder logic
 }
 
-async function fetchBilibiliProfile(accessToken: string) {
+async function fetchBilibiliProfile(
+  accessToken: string
+): Promise<RawBilibiliProfile> {
   return {
     name: "Placeholder Bilibili User",
     face: "",
@@ -56,7 +120,9 @@ async function fetchBilibiliProfile(accessToken: string) {
   };
 }
 
-async function fetchBilibiliVideos(accessToken: string) {
+async function fetchBilibiliVideos(
+  accessToken: string
+): Promise<RawBilibiliPost[]> {
   return [
     {
       id: "1",
@@ -69,7 +135,9 @@ async function fetchBilibiliVideos(accessToken: string) {
   ];
 }
 
-function normalizeBilibiliProfile(raw: any) {
+function normalizeBilibiliProfile(
+  raw: RawBilibiliProfile
+): NormalizedProfile {
   return {
     username: raw.name ?? "",
     avatar_url: raw.face ?? "",
@@ -78,7 +146,9 @@ function normalizeBilibiliProfile(raw: any) {
   };
 }
 
-function normalizeBilibiliVideo(raw: any) {
+function normalizeBilibiliVideo(
+  raw: RawBilibiliPost
+): NormalizedPost {
   return {
     platform: "bilibili",
     post_id: raw.id,

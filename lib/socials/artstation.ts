@@ -1,10 +1,24 @@
 // lib/socials/artstation.ts
 
-export async function syncArtStation(account: any, supabase: any) {
-  const { username, user_id } = account;
+import type { Account } from "./socialIndex";                 // <-- UNIVERSAL TYPE
+import type { SupabaseClient } from "@supabase/supabase-js";
+import type { Database } from "@/supabase/types";
+
+export async function syncArtStation(
+  account: Account,                                           // <-- FIXED
+  supabase: SupabaseClient<Database>                          // <-- FIXED
+) {
+  const { username, user_id } = account as unknown as {        // <-- username-based auth
+    username: string;
+    user_id: string;
+  };
 
   if (!username) {
-    return { platform: "artstation", updated: false, error: "Missing username" };
+    return {
+      platform: "artstation",
+      updated: false,
+      error: "Missing username",
+    };
   }
 
   const profile = await fetchArtStationProfile(username);
@@ -24,15 +38,64 @@ export async function syncArtStation(account: any, supabase: any) {
   });
 
   if (normalizedPosts.length > 0) {
-    await supabase.from("social_posts").upsert(normalizedPosts);
+    await supabase.from("social_posts").upsert(
+      normalizedPosts.map((p) => ({
+        ...p,
+        user_id,
+      }))
+    );
   }
 
-  return { platform: "artstation", updated: true, posts: normalizedPosts.length, metrics: true };
+  return {
+    platform: "artstation",
+    updated: true,
+    posts: normalizedPosts.length,
+    metrics: true,
+  };
 }
 
-/* Helpers */
+/* -----------------------------
+   Local Types
+------------------------------*/
 
-async function fetchArtStationProfile(username: string) {
+type RawArtStationProfile = {
+  username?: string;
+  avatar_url?: string;
+  followers?: number;
+};
+
+type RawArtStationPost = {
+  id: string;
+  title?: string;
+  cover_url?: string;
+  likes?: number;
+  comments?: number;
+  published_at?: string;
+};
+
+type NormalizedProfile = {
+  username: string;
+  avatar_url: string;
+  followers: number;
+};
+
+type NormalizedPost = {
+  platform: string;
+  post_id: string;
+  caption: string;
+  media_url: string;
+  likes: number;
+  comments: number;
+  posted_at: string;
+};
+
+/* -----------------------------
+   Helpers
+------------------------------*/
+
+async function fetchArtStationProfile(
+  username: string
+): Promise<RawArtStationProfile> {
   return {
     username: "Placeholder ArtStation Artist",
     avatar_url: "",
@@ -40,7 +103,9 @@ async function fetchArtStationProfile(username: string) {
   };
 }
 
-async function fetchArtStationProjects(username: string) {
+async function fetchArtStationProjects(
+  username: string
+): Promise<RawArtStationPost[]> {
   return [
     {
       id: "1",
@@ -53,7 +118,9 @@ async function fetchArtStationProjects(username: string) {
   ];
 }
 
-function normalizeArtStationProfile(raw: any) {
+function normalizeArtStationProfile(
+  raw: RawArtStationProfile
+): NormalizedProfile {
   return {
     username: raw.username ?? "",
     avatar_url: raw.avatar_url ?? "",
@@ -61,7 +128,9 @@ function normalizeArtStationProfile(raw: any) {
   };
 }
 
-function normalizeArtStationProject(raw: any) {
+function normalizeArtStationProject(
+  raw: RawArtStationPost
+): NormalizedPost {
   return {
     platform: "artstation",
     post_id: raw.id,

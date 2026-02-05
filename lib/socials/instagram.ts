@@ -1,7 +1,17 @@
 // lib/socials/instagram.ts
 
-export async function syncInstagram(account: any, supabase: any) {
-  const { id, access_token, refresh_token, user_id } = account;
+import type { Account } from "./socialIndex";
+import type { SupabaseClient } from "@supabase/supabase-js";
+import type { Database } from "@/supabase/types";
+
+export async function syncInstagram(
+  account: Account,
+  supabase: SupabaseClient<Database>
+) {
+  const { access_token, user_id } = account as unknown as {
+    access_token: string;
+    user_id: string;
+  };
 
   // 1. Validate account
   if (!access_token) {
@@ -13,7 +23,10 @@ export async function syncInstagram(account: any, supabase: any) {
   }
 
   // 2. Refresh token if needed
-  const refreshed = await refreshInstagramTokenIfNeeded(account, supabase);
+  const refreshed = await refreshInstagramTokenIfNeeded(
+    account as unknown as InstagramAccount,
+    supabase
+  );
 
   // 3. Fetch profile data
   const profile = await fetchInstagramProfile(refreshed.access_token);
@@ -37,7 +50,12 @@ export async function syncInstagram(account: any, supabase: any) {
   });
 
   if (normalizedPosts.length > 0) {
-    await supabase.from("social_posts").upsert(normalizedPosts);
+    await supabase.from("social_posts").upsert(
+      normalizedPosts.map((p) => ({
+        ...p,
+        user_id,
+      }))
+    );
   }
 
   // 7. Return sync summary
@@ -49,20 +67,64 @@ export async function syncInstagram(account: any, supabase: any) {
   };
 }
 
-/* -------------------------------------------------------
-   Helper Functions (Stubbed but Real)
-   These MUST exist so TypeScript stops complaining.
-   You will fill in API logic later.
--------------------------------------------------------- */
+/* -----------------------------
+   Local Types
+------------------------------*/
 
-async function refreshInstagramTokenIfNeeded(account: any, supabase: any) {
-  // TODO: implement refresh logic
-  // For now, return the account unchanged
-  return account;
+type InstagramAccount = {
+  id?: string;
+  access_token: string;
+  refresh_token?: string;
+  user_id: string;
+};
+
+type RawInstagramProfile = {
+  username?: string;
+  profile_picture?: string;
+  followers_count?: number;
+  follows_count?: number;
+};
+
+type RawInstagramPost = {
+  id: string;
+  caption?: string;
+  media_url?: string;
+  like_count?: number;
+  comments_count?: number;
+  timestamp?: string;
+};
+
+type NormalizedProfile = {
+  username: string;
+  avatar_url: string;
+  followers: number;
+  following: number;
+};
+
+type NormalizedPost = {
+  platform: string;
+  post_id: string;
+  caption: string;
+  media_url: string;
+  likes: number;
+  comments: number;
+  posted_at: string;
+};
+
+/* -----------------------------
+   Helpers (Stubbed)
+------------------------------*/
+
+async function refreshInstagramTokenIfNeeded(
+  account: InstagramAccount,
+  supabase: SupabaseClient<Database>
+): Promise<InstagramAccount> {
+  return account; // placeholder logic
 }
 
-async function fetchInstagramProfile(accessToken: string) {
-  // TODO: call Instagram Graph API
+async function fetchInstagramProfile(
+  accessToken: string
+): Promise<RawInstagramProfile> {
   return {
     username: "placeholder",
     profile_picture: "",
@@ -71,8 +133,9 @@ async function fetchInstagramProfile(accessToken: string) {
   };
 }
 
-async function fetchInstagramPosts(accessToken: string) {
-  // TODO: call Instagram Graph API
+async function fetchInstagramPosts(
+  accessToken: string
+): Promise<RawInstagramPost[]> {
   return [
     {
       id: "1",
@@ -85,7 +148,9 @@ async function fetchInstagramPosts(accessToken: string) {
   ];
 }
 
-function normalizeInstagramProfile(raw: any) {
+function normalizeInstagramProfile(
+  raw: RawInstagramProfile
+): NormalizedProfile {
   return {
     username: raw.username ?? "",
     avatar_url: raw.profile_picture ?? "",
@@ -94,7 +159,9 @@ function normalizeInstagramProfile(raw: any) {
   };
 }
 
-function normalizeInstagramPost(raw: any) {
+function normalizeInstagramPost(
+  raw: RawInstagramPost
+): NormalizedPost {
   return {
     platform: "instagram",
     post_id: raw.id,

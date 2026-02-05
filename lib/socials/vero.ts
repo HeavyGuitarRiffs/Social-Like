@@ -1,10 +1,30 @@
 // lib/socials/vero.ts
 
-export async function syncVero(account: any, supabase: any) {
-  const { access_token, user_id } = account;
+import type { Account } from "./socialIndex";
+import type { SupabaseClient } from "@supabase/supabase-js";
+import type { Database } from "@/supabase/types";
+
+export async function syncVero(
+  account: Account,
+  supabase: SupabaseClient<Database>
+) {
+  const {
+    account_id,
+    user_id,
+    access_token,
+  } = account as unknown as {
+    account_id: string;
+    user_id: string;
+    access_token: string;
+  };
 
   if (!access_token) {
-    return { platform: "vero", updated: false, error: "Missing access token" };
+    return {
+      platform: "vero",
+      updated: false,
+      error: "Missing access token",
+      account_id,
+    };
   }
 
   const profile = await fetchVeroProfile(access_token);
@@ -13,7 +33,11 @@ export async function syncVero(account: any, supabase: any) {
   const normalizedProfile = normalizeVeroProfile(profile);
   const normalizedPosts = posts.map(normalizeVeroPost);
 
+  /* ---------------------------------
+     social_profiles
+  ----------------------------------*/
   await supabase.from("social_profiles").upsert({
+    account_id,
     user_id,
     platform: "vero",
     username: normalizedProfile.username,
@@ -23,16 +47,72 @@ export async function syncVero(account: any, supabase: any) {
     last_synced: new Date().toISOString(),
   });
 
+  /* ---------------------------------
+     social_posts
+  ----------------------------------*/
   if (normalizedPosts.length > 0) {
-    await supabase.from("social_posts").upsert(normalizedPosts);
+    await supabase.from("social_posts").upsert(
+      normalizedPosts.map((p) => ({
+        ...p,
+        user_id,
+        account_id,
+      }))
+    );
   }
 
-  return { platform: "vero", updated: true, posts: normalizedPosts.length, metrics: true };
+  return {
+    platform: "vero",
+    updated: true,
+    posts: normalizedPosts.length,
+    metrics: true,
+    account_id,
+  };
 }
 
-/* Helpers */
+/* -----------------------------
+   Local Types
+------------------------------*/
 
-async function fetchVeroProfile(accessToken: string) {
+type RawVeroProfile = {
+  username?: string;
+  avatar_url?: string;
+  followers?: number;
+  following?: number;
+};
+
+type RawVeroPost = {
+  id: string;
+  text?: string;
+  media_url?: string;
+  likes?: number;
+  comments?: number;
+  created_at?: string;
+};
+
+type NormalizedProfile = {
+  username: string;
+  avatar_url: string;
+  followers: number;
+  following: number;
+};
+
+type NormalizedPost = {
+  platform: string;
+  post_id: string;
+  caption: string;
+  media_url: string;
+  likes: number;
+  comments: number;
+  posted_at: string;
+};
+
+/* -----------------------------
+   Helpers
+------------------------------*/
+
+async function fetchVeroProfile(
+  accessToken: string
+): Promise<RawVeroProfile> {
   return {
     username: "Placeholder Vero User",
     avatar_url: "",
@@ -41,7 +121,9 @@ async function fetchVeroProfile(accessToken: string) {
   };
 }
 
-async function fetchVeroPosts(accessToken: string) {
+async function fetchVeroPosts(
+  accessToken: string
+): Promise<RawVeroPost[]> {
   return [
     {
       id: "1",
@@ -54,7 +136,9 @@ async function fetchVeroPosts(accessToken: string) {
   ];
 }
 
-function normalizeVeroProfile(raw: any) {
+function normalizeVeroProfile(
+  raw: RawVeroProfile
+): NormalizedProfile {
   return {
     username: raw.username ?? "",
     avatar_url: raw.avatar_url ?? "",
@@ -63,7 +147,9 @@ function normalizeVeroProfile(raw: any) {
   };
 }
 
-function normalizeVeroPost(raw: any) {
+function normalizeVeroPost(
+  raw: RawVeroPost
+): NormalizedPost {
   return {
     platform: "vero",
     post_id: raw.id,

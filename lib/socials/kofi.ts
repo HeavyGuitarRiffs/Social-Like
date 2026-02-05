@@ -1,10 +1,24 @@
 // lib/socials/kofi.ts
 
-export async function syncKofi(account: any, supabase: any) {
-  const { username, user_id } = account;
+import type { Account } from "./socialIndex";
+import type { SupabaseClient } from "@supabase/supabase-js";
+import type { Database } from "@/supabase/types";
+
+export async function syncKofi(
+  account: Account,
+  supabase: SupabaseClient<Database>
+) {
+  const { username, user_id } = account as unknown as {
+    username: string;
+    user_id: string;
+  };
 
   if (!username) {
-    return { platform: "kofi", updated: false, error: "Missing username" };
+    return {
+      platform: "kofi",
+      updated: false,
+      error: "Missing username",
+    };
   }
 
   const profile = await fetchKofiProfile(username);
@@ -20,27 +34,78 @@ export async function syncKofi(account: any, supabase: any) {
     avatar_url: normalizedProfile.avatar_url,
     followers: normalizedProfile.supporters,
     following: 0,
-    last_synced: new Date().toISOString()
+    last_synced: new Date().toISOString(),
   });
 
   if (normalizedPosts.length > 0) {
-    await supabase.from("social_posts").upsert(normalizedPosts);
+    await supabase.from("social_posts").upsert(
+      normalizedPosts.map((p) => ({
+        ...p,
+        user_id,
+      }))
+    );
   }
 
-  return { platform: "kofi", updated: true, posts: normalizedPosts.length, metrics: true };
-}
-
-/* Helpers */
-
-async function fetchKofiProfile(username: string) {
   return {
-    username: "Placeholder Ko-fi Creator",
-    avatar_url: "",
-    supporters: 0
+    platform: "kofi",
+    updated: true,
+    posts: normalizedPosts.length,
+    metrics: true,
   };
 }
 
-async function fetchKofiPosts(username: string) {
+/* -----------------------------
+   Local Types
+------------------------------*/
+
+type RawKofiProfile = {
+  username?: string;
+  avatar_url?: string;
+  supporters?: number;
+};
+
+type RawKofiPost = {
+  id: string;
+  title?: string;
+  image_url?: string;
+  likes?: number;
+  comments?: number;
+  created_at?: string;
+};
+
+type NormalizedProfile = {
+  username: string;
+  avatar_url: string;
+  supporters: number;
+};
+
+type NormalizedPost = {
+  platform: string;
+  post_id: string;
+  caption: string;
+  media_url: string;
+  likes: number;
+  comments: number;
+  posted_at: string;
+};
+
+/* -----------------------------
+   Placeholder Fetchers
+------------------------------*/
+
+async function fetchKofiProfile(
+  username: string
+): Promise<RawKofiProfile> {
+  return {
+    username: "Placeholder Ko-fi Creator",
+    avatar_url: "",
+    supporters: 0,
+  };
+}
+
+async function fetchKofiPosts(
+  username: string
+): Promise<RawKofiPost[]> {
   return [
     {
       id: "1",
@@ -48,20 +113,28 @@ async function fetchKofiPosts(username: string) {
       image_url: "",
       likes: 0,
       comments: 0,
-      created_at: new Date().toISOString()
-    }
+      created_at: new Date().toISOString(),
+    },
   ];
 }
 
-function normalizeKofiProfile(raw: any) {
+/* -----------------------------
+   Normalizers
+------------------------------*/
+
+function normalizeKofiProfile(
+  raw: RawKofiProfile
+): NormalizedProfile {
   return {
     username: raw.username ?? "",
     avatar_url: raw.avatar_url ?? "",
-    supporters: raw.supporters ?? 0
+    supporters: raw.supporters ?? 0,
   };
 }
 
-function normalizeKofiPost(raw: any) {
+function normalizeKofiPost(
+  raw: RawKofiPost
+): NormalizedPost {
   return {
     platform: "kofi",
     post_id: raw.id,
@@ -69,6 +142,6 @@ function normalizeKofiPost(raw: any) {
     media_url: raw.image_url ?? "",
     likes: raw.likes ?? 0,
     comments: raw.comments ?? 0,
-    posted_at: raw.created_at ?? new Date().toISOString()
+    posted_at: raw.created_at ?? new Date().toISOString(),
   };
 }

@@ -1,45 +1,35 @@
-// lib/socials/wattpad.ts
+// lib/socials/kuaishou.ts
 
 import type { Account } from "./socialIndex";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/supabase/types";
 
-export async function syncWattpad(
+export async function syncKuaishou(
   account: Account,
   supabase: SupabaseClient<Database>
 ) {
-  const {
-    account_id,
-    user_id,
-    username,
-  } = account as unknown as {
-    account_id: string;
-    user_id: string;
+  const { username, user_id } = account as unknown as {
     username: string;
+    user_id: string;
   };
 
   if (!username) {
     return {
-      platform: "wattpad",
+      platform: "kuaishou",
       updated: false,
       error: "Missing username",
-      account_id,
     };
   }
 
-  const profile = await fetchWattpadProfile(username);
-  const posts = await fetchWattpadStories(username);
+  const profile = await fetchKuaishouProfile(username);
+  const posts = await fetchKuaishouPosts(username);
 
-  const normalizedProfile = normalizeWattpadProfile(profile);
-  const normalizedPosts = posts.map(normalizeWattpadStory);
+  const normalizedProfile = normalizeKuaishouProfile(profile);
+  const normalizedPosts = posts.map(normalizeKuaishouPost);
 
-  /* ---------------------------------
-     social_profiles
-  ----------------------------------*/
   await supabase.from("social_profiles").upsert({
-    account_id,
     user_id,
-    platform: "wattpad",
+    platform: "kuaishou",
     username: normalizedProfile.username,
     avatar_url: normalizedProfile.avatar_url,
     followers: normalizedProfile.followers,
@@ -47,25 +37,20 @@ export async function syncWattpad(
     last_synced: new Date().toISOString(),
   });
 
-  /* ---------------------------------
-     social_posts
-  ----------------------------------*/
   if (normalizedPosts.length > 0) {
     await supabase.from("social_posts").upsert(
       normalizedPosts.map((p) => ({
         ...p,
         user_id,
-        account_id,
       }))
     );
   }
 
   return {
-    platform: "wattpad",
+    platform: "kuaishou",
     updated: true,
     posts: normalizedPosts.length,
     metrics: true,
-    account_id,
   };
 }
 
@@ -73,20 +58,20 @@ export async function syncWattpad(
    Local Types
 ------------------------------*/
 
-type RawWattpadProfile = {
+type RawKuaishouProfile = {
   username?: string;
   avatar_url?: string;
   followers?: number;
   following?: number;
 };
 
-type RawWattpadStory = {
+type RawKuaishouPost = {
   id: string;
-  title?: string;
-  cover_url?: string;
-  reads?: number;
+  caption?: string;
+  media_url?: string;
+  likes?: number;
   comments?: number;
-  created_at?: string;
+  posted_at?: string;
 };
 
 type NormalizedProfile = {
@@ -107,37 +92,41 @@ type NormalizedPost = {
 };
 
 /* -----------------------------
-   Helpers
+   Placeholder Fetchers
 ------------------------------*/
 
-async function fetchWattpadProfile(
+async function fetchKuaishouProfile(
   username: string
-): Promise<RawWattpadProfile> {
+): Promise<RawKuaishouProfile> {
   return {
-    username: "Placeholder Wattpad Author",
+    username,
     avatar_url: "",
     followers: 0,
     following: 0,
   };
 }
 
-async function fetchWattpadStories(
+async function fetchKuaishouPosts(
   username: string
-): Promise<RawWattpadStory[]> {
+): Promise<RawKuaishouPost[]> {
   return [
     {
       id: "1",
-      title: "Placeholder Wattpad Story",
-      cover_url: "",
-      reads: 0,
+      caption: "Placeholder Kuaishou post",
+      media_url: "",
+      likes: 0,
       comments: 0,
-      created_at: new Date().toISOString(),
+      posted_at: new Date().toISOString(),
     },
   ];
 }
 
-function normalizeWattpadProfile(
-  raw: RawWattpadProfile
+/* -----------------------------
+   Normalizers
+------------------------------*/
+
+function normalizeKuaishouProfile(
+  raw: RawKuaishouProfile
 ): NormalizedProfile {
   return {
     username: raw.username ?? "",
@@ -147,16 +136,16 @@ function normalizeWattpadProfile(
   };
 }
 
-function normalizeWattpadStory(
-  raw: RawWattpadStory
+function normalizeKuaishouPost(
+  raw: RawKuaishouPost
 ): NormalizedPost {
   return {
-    platform: "wattpad",
+    platform: "kuaishou",
     post_id: raw.id,
-    caption: raw.title ?? "",
-    media_url: raw.cover_url ?? "",
-    likes: raw.reads ?? 0, // reads = likes in your schema
+    caption: raw.caption ?? "",
+    media_url: raw.media_url ?? "",
+    likes: raw.likes ?? 0,
     comments: raw.comments ?? 0,
-    posted_at: raw.created_at ?? new Date().toISOString(),
+    posted_at: raw.posted_at ?? new Date().toISOString(),
   };
 }

@@ -1,5 +1,7 @@
+//supabase\ensure-user.ts
+
 import { SupabaseClient } from "@supabase/supabase-js";
-import { createSupabaseServerClient } from "./server-client";
+
 
 export async function ensureUserRow(
   supabase: SupabaseClient,
