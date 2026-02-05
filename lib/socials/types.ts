@@ -22,4 +22,6 @@ export type NormalizedPost = {
   likes: number;
   comments: number;
   posted_at: string;
+   user_id: string;   // <-- REQUIRED FIELD
+
 };
