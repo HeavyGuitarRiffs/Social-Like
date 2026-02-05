@@ -9,7 +9,6 @@
     "esModuleInterop": true,
     "module": "esnext",
 
-    // ✅ FIX: Tailwind v4 requires a modern resolver
     "moduleResolution": "bundler",
 
     "resolveJsonModule": true,
@@ -37,5 +36,8 @@
     ".next/dev/types/**/*.ts",
     "**/*.mts"
   ],
-  "exclude": ["node_modules"]
+  "exclude": [
+    "node_modules",
+    "supabase/functions"   // <-- 🚀 FIX: exclude Deno edge functions
+  ]
 }
