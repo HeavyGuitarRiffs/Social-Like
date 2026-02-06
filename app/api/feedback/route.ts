@@ -3,15 +3,6 @@ import { Resend } from "resend";
 import { z } from "zod";
 import { createClient } from "@supabase/supabase-js";
 
-// Initialize Resend
-const resend = new Resend(process.env.RESEND_API_KEY!);
-
-// Supabase client
-const supabase = createClient(
-  process.env.SUPABASE_URL!,
-  process.env.SUPABASE_KEY!
-);
-
 // Input validation schema
 const feedbackSchema = z.object({
   email: z.string().email(),
@@ -20,6 +11,14 @@ const feedbackSchema = z.object({
 
 export async function POST(req: Request) {
   try {
+    // Initialize inside the handler (NOT at the top level)
+    const resend = new Resend(process.env.RESEND_API_KEY || "");
+
+    const supabase = createClient(
+      process.env.SUPABASE_URL || "",
+      process.env.SUPABASE_KEY || ""
+    );
+
     const json = await req.json();
     const parsed = feedbackSchema.safeParse(json);
 
@@ -29,16 +28,16 @@ export async function POST(req: Request) {
 
     const { email, message } = parsed.data;
 
-    // 1️⃣ Send email via Resend
+    // Send email via Resend
     await resend.emails.send({
       from: "Feedback <feedback@yourdomain.com>",
-      to: ["you@yourdomain.com"], // Replace with your email
+      to: ["you@yourdomain.com"],
       subject: "New Feedback Received",
       replyTo: email,
       text: `Feedback from: ${email}\n\n${message}`,
     });
 
-    // 2️⃣ Store in Supabase
+    // Store in Supabase
     await supabase.from("feedback").insert({
       email,
       message,
