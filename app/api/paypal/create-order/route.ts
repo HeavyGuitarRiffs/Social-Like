@@ -5,7 +5,8 @@ const PAYPAL_API =
   process.env.PAYPAL_ENV === "live"
     ? "https://api-m.paypal.com"
     : "https://api-m.sandbox.paypal.com";
-
+console.log("PAYPAL_CLIENT_ID:", process.env.PAYPAL_CLIENT_ID);
+console.log("PAYPAL_SECRET:", process.env.PAYPAL_SECRET ? "loaded" : "missing");
 // Get OAuth2 access token from PayPal
 async function getAccessToken() {
   const auth = Buffer.from(
