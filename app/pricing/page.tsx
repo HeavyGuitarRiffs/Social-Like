@@ -1,11 +1,7 @@
 //app\pricing\page.tsx
-
 "use client";
 
-import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
-import { createClient } from "@/lib/supabase/client";
-
+import { useState } from "react";
 import {
   Card,
   CardHeader,
@@ -14,14 +10,15 @@ import {
   CardFooter,
 } from "@/components/ui/card";
 
+import PayPalCheckout from "@/components/PayPalCheckout";
+
 type PlanId = "monthly" | "quarterly" | "semiannual" | "lifetime" | null;
 
 const tiers = [
   {
     name: "Starter",
-    price: "$10 one-time",
+    price: "$9 one-time", // ✅ updated price
     duration: "1 month access",
-    priceId: process.env.NEXT_PUBLIC_STRIPE_PRICE_STARTER,
     planKey: "monthly" as PlanId,
     subtitle: "For creators testing the waters",
     features: [
@@ -37,7 +34,6 @@ const tiers = [
     name: "Pro",
     price: "$29 one-time",
     duration: "3 months access",
-    priceId: process.env.NEXT_PUBLIC_STRIPE_PRICE_PRO,
     planKey: "quarterly" as PlanId,
     subtitle: "For creators growing across multiple platforms",
     features: [
@@ -54,7 +50,6 @@ const tiers = [
     name: "Creator Elite",
     price: "$75 one-time",
     duration: "6 months access",
-    priceId: process.env.NEXT_PUBLIC_STRIPE_PRICE_CREATOR_ELITE,
     planKey: "semiannual" as PlanId,
     subtitle: "For creators building a long-term system",
     features: [
@@ -72,7 +67,6 @@ const tiers = [
     name: "Teams / Company",
     price: "From $149 one-time",
     duration: "Lifetime access",
-    priceId: process.env.NEXT_PUBLIC_STRIPE_PRICE_TEAMS_COMPANY,
     planKey: "lifetime" as PlanId,
     subtitle: "For agencies, teams, and companies",
     features: [
@@ -88,58 +82,7 @@ const tiers = [
 ];
 
 export default function PricingPage() {
-  const router = useRouter();
-  const supabase = createClient();
-
-  const [redirectUrl, setRedirectUrl] = useState<string | null>(null);
-  const [loadingPriceId, setLoadingPriceId] = useState<string | null>(null);
-  const [userPlan, setUserPlan] = useState<PlanId>(null);
-
-  useEffect(() => {
-    if (redirectUrl) window.location.href = redirectUrl;
-  }, [redirectUrl]);
-
-  async function handleCheckout(priceId: string, plan: PlanId) {
-    try {
-      setLoadingPriceId(priceId);
-
-      // TODO: replace with real user
-      const {
-  data: { user },
-} = await supabase.auth.getUser();
-
-if (!user) {
-  router.push("/login");
-  return;
-}
-
-const userId = user.id;;
-
-      const res = await fetch("/api/checkout", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ priceId, userId, plan }),
-      });
-
-      if (!res.ok) {
-        console.error("Checkout API error:", await res.text());
-        setLoadingPriceId(null);
-        return;
-      }
-
-      const { url } = await res.json();
-      setRedirectUrl(url);
-    } catch (err) {
-      console.error("Unexpected checkout error:", err);
-      setLoadingPriceId(null);
-    }
-  }
-
-  function isUpgrade(tierPlan: PlanId): boolean {
-    if (!userPlan || !tierPlan) return false;
-    const order: PlanId[] = ["monthly", "quarterly", "semiannual", "lifetime"];
-    return order.indexOf(tierPlan) > order.indexOf(userPlan);
-  }
+  const [selectedPlan, setSelectedPlan] = useState<PlanId | null>(null);
 
   return (
     <section className="min-h-screen bg-base-100 py-20 px-6">
@@ -158,18 +101,11 @@ const userId = user.id;;
         {/* PRICING GRID */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-8 justify-items-center">
           {tiers.map((tier) => {
-            const isOwned = tier.planKey && userPlan === tier.planKey;
-            const isLoading = tier.priceId && loadingPriceId === tier.priceId;
-            const upgradeAvailable = isUpgrade(tier.planKey);
+            const isSelected = selectedPlan === tier.planKey;
 
             return (
               <Card
                 key={tier.name}
-                onClick={() => {
-                  if (tier.priceId && !isOwned && !isLoading) {
-                    handleCheckout(tier.priceId, tier.planKey);
-                  }
-                }}
                 className="
                   relative w-full max-w-sm rounded-2xl flex flex-col justify-between cursor-pointer
                   transform hover:-translate-y-1 hover:shadow-2xl transition-all
@@ -179,31 +115,14 @@ const userId = user.id;;
               >
                 {/* BEST VALUE BADGE */}
                 {tier.bestValue && (
-                  <div
-                    className="
-                      absolute top-3 left-3 
-                      rounded-full px-3 py-1 text-xs font-bold 
-                      text-green-700 dark:text-green-300
-                      bg-green-200 dark:bg-green-900/40
-                      shadow-[0_0_12px_rgba(34,197,94,0.4)] dark:shadow-[0_0_12px_rgba(34,197,94,0.8)]
-                      animate-pulse
-                    "
-                  >
+                  <div className="
+                    absolute top-3 left-3 rounded-full px-3 py-1 text-xs font-bold 
+                    text-green-700 dark:text-green-300
+                    bg-green-200 dark:bg-green-900/40
+                    shadow-[0_0_12px_rgba(34,197,94,0.4)] dark:shadow-[0_0_12px_rgba(34,197,94,0.8)]
+                    animate-pulse
+                  ">
                     Best Value
-                  </div>
-                )}
-
-                {/* OWNED */}
-                {isOwned && (
-                  <div className="absolute top-3 right-3 rounded-full bg-accent px-3 py-1 text-xs font-semibold text-black shadow-md">
-                    Owned
-                  </div>
-                )}
-
-                {/* UPGRADE */}
-                {upgradeAvailable && !isOwned && (
-                  <div className="absolute top-3 right-3 rounded-full bg-primary px-3 py-1 text-xs font-semibold text-white shadow-md">
-                    Upgrade available
                   </div>
                 )}
 
@@ -238,30 +157,37 @@ const userId = user.id;;
                 </CardContent>
 
                 <CardFooter>
-                  <div className="w-full flex items-center justify-center py-4 rounded-xl bg-base-content/5 hover:bg-base-content/10 transition">
-                    {isLoading ? (
-                      <div className="flex items-center gap-2 text-base-content text-sm">
-                        <span className="loading loading-spinner loading-sm" />
-                        <span>Redirecting to checkout…</span>
-                      </div>
-                    ) : isOwned ? (
-                      <div className="text-center w-full text-sm font-semibold text-accent">
-                        You already own this tier
-                      </div>
-                    ) : (
-                      <div className="w-full text-center font-semibold text-base-content">
-                        {tier.cta}
-                      </div>
-                    )}
-                  </div>
-                </CardFooter>
+  {!isSelected ? (
+    <div
+      className="w-full flex items-center justify-center py-4 rounded-xl bg-base-content/5 hover:bg-base-content/10 transition cursor-pointer"
+      onClick={() => setSelectedPlan(tier.planKey)}
+    >
+      <div className="w-full text-center font-semibold text-base-content">
+        {tier.cta}
+      </div>
+    </div>
+  ) : (
+    <div className="w-full flex flex-col items-center">
+      <p className="mb-2 text-sm font-medium text-base-content">
+        Complete your payment
+      </p>
+      <div className="w-full">
+        <PayPalCheckout
+          plan={tier.planKey!}        // ✅ non-null assertion
+          amount={tier.price.replace(/\D/g, '')}
+        />
+      </div>
+    </div>
+  )}
+</CardFooter>
+
               </Card>
             );
           })}
         </div>
 
         <p className="text-center text-sm text-base-content/60">
-          Lifetime access · One-time payments · Secure Stripe checkout
+          Lifetime access · One-time payments · Secure PayPal checkout
         </p>
       </div>
     </section>
