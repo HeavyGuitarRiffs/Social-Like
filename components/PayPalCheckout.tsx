@@ -8,6 +8,7 @@ import {
   ReactPayPalScriptOptions,
 } from "@paypal/react-paypal-js";
 import PayPalCardFields from "./PayPalCardFields";
+import { useEffect, useState } from "react";
 
 type PayPalCheckoutProps = {
   plan: string;
@@ -15,18 +16,31 @@ type PayPalCheckoutProps = {
 };
 
 export default function PayPalCheckout({ plan, amount }: PayPalCheckoutProps) {
+  const [clientToken, setClientToken] = useState<string | null>(null);
+
+  useEffect(() => {
+    async function fetchToken() {
+      const res = await fetch("/api/paypal/generate-client-token", { method: "POST" });
+      const data = await res.json();
+      setClientToken(data.clientToken);
+    }
+    fetchToken();
+  }, []);
+
+  if (!clientToken) return <div>Loading payment options…</div>;
+
   const initialOptions: ReactPayPalScriptOptions = {
     clientId: process.env.NEXT_PUBLIC_PAYPAL_CLIENT_ID!,
     "client-id": process.env.NEXT_PUBLIC_PAYPAL_CLIENT_ID!,
     currency: "USD",
     intent: "capture",
     components: "buttons,hosted-fields",
+    dataClientToken: clientToken,
   };
 
   return (
     <PayPalScriptProvider options={initialOptions}>
       <div className="space-y-6">
-        {/* PayPal Button */}
         <PayPalButtons
           style={{ layout: "vertical" }}
           createOrder={async () => {
@@ -39,8 +53,6 @@ export default function PayPalCheckout({ plan, amount }: PayPalCheckoutProps) {
             });
 
             const data = await res.json();
-            if (!data.id) throw new Error("PayPal order creation failed");
-
             return data.id;
           }}
           onApprove={async (data) => {
@@ -51,16 +63,14 @@ export default function PayPalCheckout({ plan, amount }: PayPalCheckoutProps) {
             });
 
             const capture = await res.json();
-
-            if (capture.status === "COMPLETED") {
-              alert("PayPal payment successful!");
-            } else {
-              alert("Payment failed or pending.");
-            }
+            alert(
+              capture.status === "COMPLETED"
+                ? "PayPal payment successful!"
+                : "Payment failed."
+            );
           }}
         />
 
-        {/* Card Fields */}
         <PayPalCardFields plan={plan} amount={amount} />
       </div>
     </PayPalScriptProvider>
