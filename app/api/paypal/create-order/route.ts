@@ -5,8 +5,7 @@ const PAYPAL_API =
   process.env.PAYPAL_ENV === "live"
     ? "https://api-m.paypal.com"
     : "https://api-m.sandbox.paypal.com";
-console.log("PAYPAL_CLIENT_ID:", process.env.PAYPAL_CLIENT_ID);
-console.log("PAYPAL_SECRET:", process.env.PAYPAL_SECRET ? "loaded" : "missing");
+
 // Get OAuth2 access token from PayPal
 async function getAccessToken() {
   const auth = Buffer.from(
@@ -25,6 +24,7 @@ async function getAccessToken() {
   const data = await res.json();
 
   if (!data.access_token) {
+    console.error("❌ [CREATE ORDER] Failed to get access token:", data);
     throw new Error("Failed to get PayPal access token");
   }
 
@@ -34,6 +34,8 @@ async function getAccessToken() {
 export async function POST(req: Request) {
   try {
     const { plan, amount } = await req.json();
+
+    console.log("📦 [CREATE ORDER] Incoming:", { plan, amount });
 
     if (!amount) {
       return NextResponse.json({ error: "Amount is required" }, { status: 400 });
@@ -61,24 +63,28 @@ export async function POST(req: Request) {
           },
         ],
         application_context: {
-          brand_name: "My SaaS App",           // optional branding
+          brand_name: "My SaaS App",
           landing_page: "NO_PREFERENCE",
-          user_action: "PAY_NOW",             // encourages card payment flow
-          shipping_preference: "NO_SHIPPING", // digital product, no shipping
+          user_action: "PAY_NOW",
+          shipping_preference: "NO_SHIPPING",
         },
       }),
     });
 
     const orderData = await orderRes.json();
 
+    console.log("📦 [CREATE ORDER] PayPal response:", orderData);
+
     if (!orderData.id) {
-      console.error("PayPal order error:", orderData);
+      console.error("❌ [CREATE ORDER] Failed:", orderData);
       return NextResponse.json({ error: "Failed to create order" }, { status: 500 });
     }
 
+    console.log("📦 [CREATE ORDER] SUCCESS:", { orderID: orderData.id });
+
     return NextResponse.json({ id: orderData.id });
   } catch (err) {
-    console.error("Create order error:", err);
+    console.error("❌ [CREATE ORDER] Error:", err);
     return NextResponse.json({ error: "Server error" }, { status: 500 });
   }
 }

@@ -1,10 +1,13 @@
+//app\api\paypal\generate-client-token\route.ts
+
 import { NextResponse } from "next/server";
 
 export async function POST() {
   try {
+    console.log("🔑 [CLIENT TOKEN] Generating client token...");
+
     const clientId = process.env.PAYPAL_CLIENT_ID!;
     const secret = process.env.PAYPAL_SECRET!;
-
     const auth = Buffer.from(`${clientId}:${secret}`).toString("base64");
 
     const res = await fetch(
@@ -24,13 +27,14 @@ export async function POST() {
     const data = await res.json();
 
     if (!data.client_token) {
-      console.error("Failed to generate client token:", data);
+      console.error("❌ [CLIENT TOKEN] Failed to generate:", data);
       return NextResponse.json({ error: "Failed to generate client token" }, { status: 500 });
     }
 
+    console.log("🔑 [CLIENT TOKEN] Token generated successfully");
     return NextResponse.json({ clientToken: data.client_token });
   } catch (err) {
-    console.error("Client token error:", err);
+    console.error("❌ [CLIENT TOKEN] Error:", err);
     return NextResponse.json({ error: "Server error" }, { status: 500 });
   }
 }
