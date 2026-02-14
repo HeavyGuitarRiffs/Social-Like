@@ -2,7 +2,12 @@
 
 "use client";
 
-import { PayPalScriptProvider, PayPalButtons, ReactPayPalScriptOptions } from "@paypal/react-paypal-js";
+import {
+  PayPalScriptProvider,
+  PayPalButtons,
+  ReactPayPalScriptOptions,
+} from "@paypal/react-paypal-js";
+import PayPalCardFields from "./PayPalCardFields";
 
 type PayPalCheckoutProps = {
   plan: string;
@@ -10,53 +15,54 @@ type PayPalCheckoutProps = {
 };
 
 export default function PayPalCheckout({ plan, amount }: PayPalCheckoutProps) {
-  // ✅ satisfy TS with clientId, SDK runtime with "client-id"
   const initialOptions: ReactPayPalScriptOptions = {
-    clientId: process.env.NEXT_PUBLIC_PAYPAL_CLIENT_ID!, // satisfies TypeScript
-    "client-id": process.env.NEXT_PUBLIC_PAYPAL_CLIENT_ID!, // required by SDK runtime
+    clientId: process.env.NEXT_PUBLIC_PAYPAL_CLIENT_ID!,
+    "client-id": process.env.NEXT_PUBLIC_PAYPAL_CLIENT_ID!,
     currency: "USD",
     intent: "capture",
+    components: "buttons,hosted-fields",
   };
 
   return (
     <PayPalScriptProvider options={initialOptions}>
-      <PayPalButtons
-        style={{ layout: "vertical" }}
-        createOrder={async () => {
-          const formattedAmount = parseFloat(amount).toFixed(2); // 2 decimals
+      <div className="space-y-6">
+        {/* PayPal Button */}
+        <PayPalButtons
+          style={{ layout: "vertical" }}
+          createOrder={async () => {
+            const formattedAmount = parseFloat(amount).toFixed(2);
 
-          const res = await fetch("/api/paypal/create-order", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ plan, amount: formattedAmount }),
-          });
+            const res = await fetch("/api/paypal/create-order", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ plan, amount: formattedAmount }),
+            });
 
-          const data = await res.json();
+            const data = await res.json();
+            if (!data.id) throw new Error("PayPal order creation failed");
 
-          if (!data.id) {
-            console.error("No order ID returned from create-order API:", data);
-            throw new Error("PayPal order creation failed");
-          }
+            return data.id;
+          }}
+          onApprove={async (data) => {
+            const res = await fetch("/api/paypal/capture-order", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ orderID: data.orderID }),
+            });
 
-          return data.id; // order ID for popup
-        }}
-        onApprove={async (data) => {
-          const res = await fetch("/api/paypal/capture-order", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ orderID: data.orderID }),
-          });
+            const capture = await res.json();
 
-          const capture = await res.json();
+            if (capture.status === "COMPLETED") {
+              alert("PayPal payment successful!");
+            } else {
+              alert("Payment failed or pending.");
+            }
+          }}
+        />
 
-          if (capture.status === "COMPLETED") {
-            alert("Payment successful! Activate SaaS access here.");
-          } else {
-            alert("Payment failed or pending.");
-            console.error("Capture details:", capture);
-          }
-        }}
-      />
+        {/* Card Fields */}
+        <PayPalCardFields plan={plan} amount={amount} />
+      </div>
     </PayPalScriptProvider>
   );
 }
