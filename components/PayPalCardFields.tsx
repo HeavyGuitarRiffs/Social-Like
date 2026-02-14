@@ -1,5 +1,4 @@
 //components\PayPalCardFields.tsx
-
 "use client";
 
 import {
@@ -10,7 +9,6 @@ import {
 import { useState } from "react";
 
 export default function PayPalCardFields({ plan, amount }: { plan: string; amount: string }) {
-  // PayPal requires createOrder at the provider level
   async function createOrder() {
     const formattedAmount = parseFloat(amount).toFixed(2);
 
@@ -38,12 +36,12 @@ export default function PayPalCardFields({ plan, amount }: { plan: string; amoun
         ".invalid": { color: "red" },
       }}
     >
-      <CardFieldsInner />
+      <CardFieldsInner plan={plan} />
     </PayPalHostedFieldsProvider>
   );
 }
 
-function CardFieldsInner() {
+function CardFieldsInner({ plan }: { plan: string }) {
   const hostedFields = usePayPalHostedFields();
   const [loading, setLoading] = useState(false);
 
@@ -56,7 +54,6 @@ function CardFieldsInner() {
     try {
       setLoading(true);
 
-      // 1. Submit card fields (this triggers 3D Secure if required)
       const submitResult = await hostedFields.cardFields.submit({
         contingencies: ["3D_SECURE"],
       });
@@ -64,11 +61,10 @@ function CardFieldsInner() {
       const orderID = submitResult.orderId;
       if (!orderID) throw new Error("Order ID missing after Hosted Fields submit");
 
-      // 2. Capture order
       const captureRes = await fetch("/api/paypal/capture-order", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ orderID }),
+        body: JSON.stringify({ orderID, plan }),
       });
 
       const capture = await captureRes.json();
