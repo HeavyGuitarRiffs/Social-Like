@@ -1,349 +1,368 @@
-// app/page.tsx (Landing Page)
 "use client";
 
+import { useEffect, useState, ComponentType, SVGProps } from "react";
 import Link from "next/link";
 import Image from "next/image";
-import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
+import { Button } from "@/components/ui/button";
+import { useUser } from "@/components/providers/UserProvider";
+import { useTheme } from "next-themes";
+import { Sun, Moon } from "lucide-react";
 
-export default function LandingPage() {
-  const [hasScrolled, setHasScrolled] = useState(false);
+// Social icons
+import {
+  FaFacebook,
+  FaInstagram,
+  FaTwitter,
+  FaTiktok,
+  FaSnapchat,
+  FaLinkedin,
+  FaPinterest,
+  FaReddit,
+  FaYoutube,
+  FaWhatsapp,
+  FaTelegram,
+  FaDiscord,
+} from "react-icons/fa";
 
-  useEffect(() => {
-    const onScroll = () => {
-      if (window.scrollY > 40) setHasScrolled(true);
-    };
+/* ------------------------------------------------------------------ */
+/* Types */
+interface StatCard {
+  platform: string;
+  percent: string;
+  postsToday: number;
+  commentCountStart: number;
+  totalPosts?: number;
+  totalComments?: number;
+  Icon?: ComponentType<SVGProps<SVGSVGElement>>;
+}
 
-    window.addEventListener("scroll", onScroll);
-    return () => window.removeEventListener("scroll", onScroll);
-  }, []);
+/* ------------------------------------------------------------------ */
+/* Static maps (SSR-safe) */
+const socialIconMap: Record<string, ComponentType<SVGProps<SVGSVGElement>>> = {
+  Facebook: FaFacebook,
+  Instagram: FaInstagram,
+  Twitter: FaTwitter,
+  TikTok: FaTiktok,
+  Snapchat: FaSnapchat,
+  LinkedIn: FaLinkedin,
+  Pinterest: FaPinterest,
+  Reddit: FaReddit,
+  YouTube: FaYoutube,
+  WhatsApp: FaWhatsapp,
+  Telegram: FaTelegram,
+  Discord: FaDiscord,
+};
+
+const socialNames = Object.keys(socialIconMap);
+
+/* ------------------------------------------------------------------ */
+/* Sidebar */
+export function Sidebar() {
+  const { theme, setTheme } = useTheme();
 
   return (
-    <main className="min-h-screen bg-base-100 text-base-content">
-      {/* =========================================================
-          HERO
-      ========================================================= */}
-      <section className="relative overflow-hidden">
-        <div className="mx-auto max-w-6xl px-6 pt-20 pb-24 md:pt-28 md:pb-32">
-          {/* Pain-point tag */}
-          <div className="mb-4 inline-flex items-center rounded-full bg-base-200 px-3 py-1 text-xs font-medium text-base-content/70">
-            You’re posting everywhere… but you don’t know what’s actually working.
-          </div>
+    <aside className="group fixed left-0 top-0 h-full w-20 hover:w-64 bg-background border-r border-border flex flex-col items-start py-8 px-4 transition-all duration-300 z-50">
+      <div className="w-12 h-12 mb-6 ml-1 group-hover:ml-0 transition-all">
+        <Image
+          src="/icon.png"
+          alt="Social Like Logo"
+          width={48}
+          height={48}
+          className="rounded-full"
+          priority
+        />
+      </div>
 
-          <div className="grid gap-12 md:grid-cols-2 md:items-center">
-            {/* LEFT: TEXT */}
-            <div className="space-y-6">
-              <h1 className="text-4xl md:text-5xl lg:text-6xl font-extrabold tracking-tight">
-                Track the social voice you’ve been blind to.
-              </h1>
+      <nav className="flex flex-col gap-6 mt-4 w-full">
+        {[
+          { label: "Home", href: "/" },
+          { label: "About", href: "/about" },
+          { label: "Pricing", href: "/pricing" },
+          { label: "Connect", href: "/dashboard/connect" },
+          { label: "Dashboard", href: "/dashboard" },
+        ].map(item => (
+          <Link
+            key={item.href}
+            href={item.href}
+            className="flex items-center gap-3 opacity-70 hover:opacity-100 transition text-lg"
+          >
+            <span className="w-6 h-6 bg-muted rounded-md" />
+            <span className="hidden group-hover:inline-block">
+              {item.label}
+            </span>
+          </Link>
+        ))}
+      </nav>
 
-              <p className="text-base md:text-lg text-base-content/70 max-w-xl">
-                SocialLike unifies every platform you create on — giving you one
-                clear, compounding analytics engine that finally shows what’s
-                working, what’s not, and what to do next.
-              </p>
-
-              {/* CTAs */}
-              <div className="flex flex-wrap gap-3 pt-2">
-                <Link
-                  href="/pricing"
-                  className="inline-flex items-center justify-center rounded-full bg-accent px-6 py-3 text-sm font-semibold text-accent-content shadow-lg shadow-accent/30 hover:shadow-accent/50 transition"
-                >
-                  Start tracking my social voice
-                </Link>
-
-                <a
-                  href="#how-it-works"
-                  className="inline-flex items-center justify-center rounded-full border border-base-content/20 px-6 py-3 text-sm font-semibold text-base-content/80 hover:bg-base-200 transition"
-                >
-                  See how it works
-                </a>
-              </div>
-
-              {/* Trust bar */}
-              <div className="pt-6 text-xs md:text-sm text-base-content/60 space-y-1">
-                <p>
-                  Built for creators across YouTube, TikTok, Instagram, X, and
-                  more.
-                </p>
-                <p>
-                  Designed by a creator-first founder. No subscriptions. One-time
-                  access.
-                </p>
-              </div>
-            </div>
-
-            {/* RIGHT: HERO PREVIEW */}
-            <div
-              className={`relative rounded-3xl bg-base-200/80 border border-base-content/10 p-4 md:p-6 shadow-xl shadow-base-300/40 transform transition duration-700 ${
-                hasScrolled ? "md:translate-y-0" : "md:-translate-y-2"
-              }`}
-            >
-              <div className="space-y-4">
-                {/* Header bar */}
-                <div className="flex items-center justify-between">
-                  <div className="h-3 w-16 rounded-full bg-base-content/10" />
-                  <div className="flex gap-2">
-                    <span className="h-2 w-2 rounded-full bg-emerald-400" />
-                    <span className="h-2 w-2 rounded-full bg-amber-400" />
-                    <span className="h-2 w-2 rounded-full bg-rose-400" />
-                  </div>
-                </div>
-
-                {/* Cards */}
-                <div className="grid gap-4 md:grid-cols-2">
-                  {/* Momentum */}
-                  <div className="rounded-2xl bg-base-100 p-4 space-y-2">
-                    <p className="text-xs font-semibold text-base-content/60 uppercase tracking-wide">
-                      Momentum score
-                    </p>
-                    <p className="text-3xl font-extrabold">87</p>
-                    <p className="text-xs text-base-content/60">
-                      Your last 14 posts are compounding faster than 92% of your
-                      history.
-                    </p>
-                  </div>
-
-                  {/* Linktree detection */}
-                  <div className="rounded-2xl bg-base-100 p-4 space-y-2">
-                    <p className="text-xs font-semibold text-base-content/60 uppercase tracking-wide">
-                      Linktree auto-detection
-                    </p>
-                    <p className="text-sm text-base-content/80">
-                      We found 6 platforms connected to your link-in-bio.
-                    </p>
-                    <ul className="mt-1 space-y-1 text-xs text-base-content/70">
-                      <li>✓ YouTube · 124 videos</li>
-                      <li>✓ TikTok · 312 posts</li>
-                      <li>✓ Instagram · 204 posts</li>
-                    </ul>
-                  </div>
-                </div>
-
-                {/* Heatmap */}
-                <div className="rounded-2xl bg-base-100 p-4">
-                  <p className="text-xs font-semibold text-base-content/60 uppercase tracking-wide mb-2">
-                    Posting heatmap
-                  </p>
-
-                  <div className="grid grid-cols-7 gap-1">
-                    {Array.from({ length: 21 }).map((_, i) => (
-                      <div
-                        key={i}
-                        className={`h-6 rounded-md ${
-                          i % 5 === 0
-                            ? "bg-emerald-500/80"
-                            : i % 3 === 0
-                            ? "bg-emerald-400/60"
-                            : "bg-base-200"
-                        }`}
-                      />
-                    ))}
-                  </div>
-
-                  <p className="mt-2 text-[11px] text-base-content/60">
-                    See exactly when your audience is most active across
-                    platforms.
-                  </p>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* =========================================================
-          WHY YOU’RE STRUGGLING
-      ========================================================= */}
-      <section className="border-t border-base-content/10 bg-base-100">
-        <div className="mx-auto max-w-5xl px-6 py-16 space-y-8">
-          <h2 className="text-2xl md:text-3xl font-bold">
-            Why your growth feels random (and it’s not your fault)
-          </h2>
-
-          <p className="text-base text-base-content/70 max-w-2xl">
-            Every platform gives you a different dashboard, different metrics,
-            and different definitions of “success”. You’re forced to guess what’s
-            working — and hope your next post lands.
-          </p>
-
-          <div className="grid gap-6 md:grid-cols-3">
-            {[
-              "Your analytics are scattered across 5–10 different apps.",
-              "You don’t know which posts actually drive momentum over time.",
-              "You don’t know when your audience is most active across platforms.",
-              "You can’t see where your voice is strongest — or where to double down.",
-              "You’re stuck reacting to spikes instead of building compounding growth.",
-              "You’re creating daily, but your feedback loop is broken.",
-            ].map((item, idx) => (
-              <div
-                key={idx}
-                className="rounded-2xl bg-base-200/70 p-4 text-sm text-base-content/80"
-              >
-                {item}
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* =========================================================
-          HOW IT WORKS
-      ========================================================= */}
-      <section
-        id="how-it-works"
-        className="border-t border-base-content/10 bg-base-200/40"
+      <button
+        onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
+        className="mt-auto flex items-center gap-3 opacity-70 hover:opacity-100 transition text-lg"
       >
-        <div className="mx-auto max-w-5xl px-6 py-16 space-y-10">
-          <div className="space-y-3">
-            <h2 className="text-2xl md:text-3xl font-bold">
-              How SocialLike works
-            </h2>
-            <p className="text-base text-base-content/70 max-w-2xl">
-              We turn your scattered social presence into one clear,
-              compounding analytics engine.
+        {theme === "dark" ? (
+          <Sun className="w-6 h-6" />
+        ) : (
+          <Moon className="w-6 h-6" />
+        )}
+        <span className="hidden group-hover:inline-block">
+          {theme === "dark" ? "Light Mode" : "Dark Mode"}
+        </span>
+      </button>
+    </aside>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/* Page */
+export default function Home() {
+  const router = useRouter();
+  const { user, loading: authLoading } = useUser();
+
+  const [mounted, setMounted] = useState(false);
+  const [onlineCount, setOnlineCount] = useState(0);
+  const [socialPower, setSocialPower] = useState(128420);
+  const [toastIndex, setToastIndex] = useState(0);
+  const [cards, setCards] = useState<StatCard[]>([]);
+
+  useEffect(() => {
+    requestAnimationFrame(() => setMounted(true));
+  }, []);
+
+  useEffect(() => {
+    if (!mounted) return;
+    requestAnimationFrame(() => {
+      const generated: StatCard[] = Array.from({ length: 90 }, (_, i) => {
+        const platform = socialNames[i % socialNames.length];
+        return {
+          platform,
+          Icon: socialIconMap[platform],
+          percent: `+${Math.floor(Math.random() * 5) + 1}%`,
+          postsToday: Math.floor(Math.random() * 15),
+          commentCountStart: Math.floor(Math.random() * 200),
+          totalPosts: Math.floor(Math.random() * 500),
+          totalComments: Math.floor(Math.random() * 5000),
+        };
+      });
+      setCards(generated);
+    });
+  }, [mounted]);
+
+  useEffect(() => {
+    if (!mounted) return;
+    const i = setInterval(
+      () => setSocialPower(p => p + Math.floor(Math.random() * 10) + 1),
+      120
+    );
+    return () => clearInterval(i);
+  }, [mounted]);
+
+  useEffect(() => {
+    if (!mounted) return;
+    const i = setInterval(
+      () => setOnlineCount(p => p + Math.floor(Math.random() * 3)),
+      2000
+    );
+    return () => clearInterval(i);
+  }, [mounted]);
+
+  useEffect(() => {
+    if (!mounted || cards.length === 0) return;
+    const i = setInterval(
+      () => setToastIndex(p => (p + 1) % cards.length),
+      7000
+    );
+    return () => clearInterval(i);
+  }, [mounted, cards.length]);
+
+  if (!mounted) return null;
+
+  const toastPositions = ["top-20", "bottom-20"];
+  const toastPosition = toastPositions[toastIndex % 2];
+
+  return (
+    <>
+      <Sidebar />
+
+      {/* SOCIAL POWER */}
+      <div className="fixed right-6 top-1/2 -translate-y-1/2 z-50 bg-base-200 shadow-xl rounded-xl px-6 py-4 border border-base-300">
+        <p className="text-sm opacity-70 font-semibold tracking-wide">
+          SOCIAL POWER
+        </p>
+        <p className="text-4xl font-extrabold text-primary tabular-nums">
+          {socialPower}
+        </p>
+      </div>
+
+      {/* HERO */}
+      <section className="relative min-h-screen flex items-center justify-center pl-28 pr-6 bg-base-100 overflow-hidden">
+        <div
+          className="absolute right-0 top-0 h-full w-1/2 opacity-60 pointer-events-none"
+          style={{
+            backgroundImage: "url('/quantumswirl.png')",
+            backgroundSize: "cover",
+            backgroundPosition: "center",
+          }}
+        />
+
+        <div className="relative z-10 max-w-6xl w-full grid lg:grid-cols-2 gap-16 items-center">
+          <div className="space-y-10">
+            <h1 className="text-[48px] font-extrabold">
+              The <span className="text-primary">Universal Incentive Engine</span>
+            </h1>
+
+            <p className="mt-6 max-w-xl text-lg text-muted-foreground sm:text-xl">
+              Social Like unifies every creator platform into one compounding
+              analytics engine — powering growth, monetization, and the
+              incentives that move the internet.
+            </p>
+
+            <p className="text-lg text-base-content/70 font-medium">
+              {onlineCount === 1
+                ? "1 person now checking Social Like"
+                : `${onlineCount} people now checking Social Like`}
             </p>
           </div>
 
-          <div className="grid gap-8 md:grid-cols-3">
-            {/* Step 1 */}
-            <div className="space-y-3">
-              <div className="text-xs font-semibold uppercase tracking-wide text-accent">
-                Step 1
+          <div className="flex flex-col gap-4">
+            <Link
+              href="/login"
+              className="inline-flex items-center justify-center rounded-full bg-primary px-8 py-4 text-lg font-bold text-primary-content hover:scale-105 transition"
+            >
+              Start Tracking
+            </Link>
+
+            {authLoading ? (
+              <div className="px-6 py-3 bg-secondary/50 rounded-full animate-pulse text-center text-secondary-content">
+                Checking...
               </div>
-              <h3 className="text-lg font-semibold">
-                Connect your socials
-              </h3>
-              <p className="text-sm text-base-content/70">
-                Paste your Linktree or connect platforms directly. We detect
-                where you create and start pulling your content and engagement.
+            ) : !user ? (
+              <Button
+                onClick={() => router.push("/login")}
+                className="px-6 py-3 bg-secondary text-secondary-content hover:scale-105 transition"
+              >
+                Login / Sign Up
+              </Button>
+            ) : null}
+          </div>
+        </div>
+      </section>
+
+      {/* FEATURES */}
+      <section id="features" className="py-32 px-10 bg-base-200">
+        <div className="max-w-6xl mx-auto space-y-20">
+          <h2 className="text-6xl font-extrabold text-center">
+            One Dashboard. Every Platform.
+          </h2>
+
+          <div className="grid md:grid-cols-3 gap-12">
+            <div className="p-10 bg-base-100 rounded-3xl shadow-xl space-y-4">
+              <h3 className="text-3xl font-bold">Unified Analytics</h3>
+              <p className="text-base-content/70">
+                See your entire creator footprint in one place — no more switching apps.
               </p>
             </div>
 
-            {/* Step 2 */}
-            <div className="space-y-3">
-              <div className="text-xs font-semibold uppercase tracking-wide text-accent">
-                Step 2
-              </div>
-              <h3 className="text-lg font-semibold">
-                We unify your analytics
-              </h3>
-              <p className="text-sm text-base-content/70">
-                SocialLike normalizes your data across platforms, calculates
-                momentum and velocity, and builds a single source of truth for
-                your growth.
+            <div className="p-10 bg-base-100 rounded-3xl shadow-xl space-y-4">
+              <h3 className="text-3xl font-bold">Real Influence</h3>
+              <p className="text-base-content/70">
+                Your audience is bigger than your follower count. Social Like proves it.
               </p>
             </div>
 
-            {/* Step 3 */}
-            <div className="space-y-3">
-              <div className="text-xs font-semibold uppercase tracking-wide text-accent">
-                Step 3
-              </div>
-              <h3 className="text-lg font-semibold">
-                You act with clarity
-              </h3>
-              <p className="text-sm text-base-content/70">
-                See what’s working, when to post, and where your voice is
-                strongest — so every piece of content pushes your growth forward.
+            <div className="p-10 bg-base-100 rounded-3xl shadow-xl space-y-4">
+              <h3 className="text-3xl font-bold">Monetization Ready</h3>
+              <p className="text-base-content/70">
+                Unlock insights that help you negotiate brand deals and sponsorships.
               </p>
             </div>
           </div>
         </div>
       </section>
 
-      {/* =========================================================
-          FEATURE PREVIEW
-      ========================================================= */}
-      <section className="border-t border-base-content/10 bg-base-100">
-        <div className="mx-auto max-w-5xl px-6 py-16 space-y-10">
-          <div className="space-y-3">
-            <h2 className="text-2xl md:text-3xl font-bold">
-              A preview of what you unlock inside the app
-            </h2>
-            <p className="text-base text-base-content/70 max-w-2xl">
-              The best landings don’t just tell you what you get — they show you.
-              Here’s a glimpse of the pages you’ll actually use.
+      {/* TESTIMONIALS */}
+      <section className="py-32 px-10 bg-base-100">
+        <div className="max-w-6xl mx-auto space-y-20">
+          <h2 className="text-6xl font-extrabold text-center">
+            Loved by Creators Everywhere
+          </h2>
+
+          <div className="grid md:grid-cols-3 gap-12">
+            <div className="p-10 bg-base-200 rounded-3xl shadow-xl space-y-4">
+              <p className="text-lg italic">
+                “Social Like showed me influence I didn’t even know I had.”
+              </p>
+              <p className="font-bold">— Alex, Music Creator</p>
+            </div>
+
+            <div className="p-10 bg-base-200 rounded-3xl shadow-xl space-y-4">
+              <p className="text-lg italic">
+                “Finally a dashboard that understands creators.”
+              </p>
+              <p className="font-bold">— Maya, Fashion Influencer</p>
+            </div>
+
+            <div className="p-10 bg-base-200 rounded-3xl shadow-xl space-y-4">
+              <p className="text-lg italic">
+                “My brand deals doubled after using Social Like.”
+              </p>
+              <p className="font-bold">— Jordan, YouTuber</p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* PRODUCT HUNT BADGE */}
+      <a
+        href="https://www.producthunt.com"
+        target="_blank"
+        rel="noopener noreferrer"
+        className="fixed bottom-6 left-6 z-40 opacity-80 hover:opacity-100 transition hidden md:block"
+      >
+
+        
+        <Image
+          src="https://api.producthunt.com/widgets/embed-image/v1/featured.svg?post_id=000000&theme=light"
+          alt="Product Hunt"
+          width={250}
+          height={54}
+        />
+      </a>
+
+      {/* FOOTERS */}
+      <footer className="py-20 px-10 bg-base-200 border-t border-base-300">
+        <div className="max-w-6xl mx-auto grid md:grid-cols-3 gap-12">
+          <div>
+            <h3 className="text-xl font-bold mb-4">Social Like</h3>
+            <p className="text-base-content/70">
+              The universal incentive engine for creators.
             </p>
           </div>
 
-          <div className="grid gap-6 md:grid-cols-3">
-            {[
-              {
-                title: "Analytics Dashboard",
-                desc: "One place to see your cross-platform performance, momentum, and growth trends.",
-                note: "Gated for premium users in your current middleware.",
-              },
-              {
-                title: "Insights & Recommendations",
-                desc: "Opinionated insights that tell you what to do next — not just what happened.",
-                note: "Also gated for premium users. This is where the “aha” moments live.",
-              },
-              {
-                title: "Linktree Intelligence",
-                desc: "Paste your link-in-bio once. We detect your platforms and start tracking them.",
-                note: "Premium-only in your middleware — a core reason to upgrade.",
-              },
-            ].map((card, i) => (
-              <div key={i} className="rounded-2xl bg-base-200 p-4 space-y-2">
-                <h3 className="text-sm font-semibold">{card.title}</h3>
-                <p className="text-xs text-base-content/70">{card.desc}</p>
-                <p className="text-[11px] text-base-content/60">{card.note}</p>
-              </div>
-            ))}
+          <div>
+            <h3 className="text-xl font-bold mb-4">Trust & Security</h3>
+            <ul className="space-y-2 text-base-content/70">
+              <li>🔒 Secure authentication</li>
+              <li>🛡️ Encrypted data</li>
+              <li>💳 Stripe-powered payments</li>
+              <li>📄 Transparent pricing</li>
+            </ul>
+          </div>
+
+          <div>
+            <h3 className="text-xl font-bold mb-4">Company</h3>
+            <ul className="space-y-2 text-base-content/70">
+              <li><a href="/about">About</a></li>
+              <li><a href="/pricing">Pricing</a></li>
+              <li><a href="/terms">Terms</a></li>
+              <li><a href="/privacy">Privacy</a></li>
+            </ul>
           </div>
         </div>
-      </section>
+      </footer>
 
-      {/* =========================================================
-          PRICING PREVIEW
-      ========================================================= */}
-      <section className="border-t border-base-content/10 bg-base-200/40">
-        <div className="mx-auto max-w-5xl px-6 py-16 space-y-6 text-center">
-          <h2 className="text-2xl md:text-3xl font-bold">
-            One-time payment. No subscriptions. Full creator analytics.
-          </h2>
-
-          <p className="text-base text-base-content/70 max-w-2xl mx-auto">
-            Unlock SocialLike Premium once and keep your access. Choose the
-            access window that matches your current season — 1 month, 3 months,
-            6 months, or lifetime.
-          </p>
-
-          <div className="pt-4">
-            <Link
-              href="/pricing"
-              className="inline-flex items-center justify-center rounded-full bg-accent px-8 py-3 text-sm font-semibold text-accent-content shadow-lg shadow-accent/30 hover:shadow-accent/50 transition"
-            >
-              View pricing & plans
-            </Link>
-          </div>
-        </div>
-      </section>
-
-      {/* =========================================================
-          FINAL CTA
-      ========================================================= */}
-      <section className="border-t border-base-content/10 bg-base-100">
-        <div className="mx-auto max-w-4xl px-6 py-16 text-center space-y-5">
-          <h2 className="text-2xl md:text-3xl font-bold">
-            Start tracking your untracked social voice.
-          </h2>
-
-          <p className="text-base text-base-content/70 max-w-2xl mx-auto">
-            Your growth becomes clear the moment you connect. Stop guessing.
-            Start compounding.
-          </p>
-
-          <div className="pt-2">
-            <Link
-              href="/pricing"
-              className="inline-flex items-center justify-center rounded-full bg-accent px-8 py-3 text-sm font-semibold text-accent-content shadow-lg shadow-accent/30 hover:shadow-accent/50 transition"
-            >
-              Unlock SocialLike Premium
-            </Link>
-          </div>
-        </div>
-      </section>
-    </main>
+      <footer className="w-full border-t border-border mt-16 py-8 px-6 text-center text-sm text-muted-foreground">
+        © {new Date().getFullYear()} Social Like. All rights reserved.
+      </footer>
+    </>
   );
 }
