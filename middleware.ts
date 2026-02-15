@@ -58,10 +58,14 @@ export async function middleware(req: NextRequest) {
 
   const plan = userPlan?.plan_id || "free";
 
-  // Paid-only routes
-  const paidRoutes = ["/dashboard/analytics", "/dashboard/insights"];
+  // Paid-only routes (now includes Linktree)
+  const paidRoutes = [
+    "/dashboard/analytics",
+    "/dashboard/insights",
+    "/dashboard/linktree"
+  ];
 
-  if (paidRoutes.some(route => url === route) && plan === "free") {
+  if (paidRoutes.includes(url) && plan === "free") {
     return NextResponse.redirect(new URL("/upgrade", req.url));
   }
 

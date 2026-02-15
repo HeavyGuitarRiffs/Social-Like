@@ -6,7 +6,6 @@ const PAYPAL_API =
     ? "https://api-m.paypal.com"
     : "https://api-m.sandbox.paypal.com";
 
-// Get OAuth2 access token from PayPal
 async function getAccessToken() {
   const auth = Buffer.from(
     `${process.env.PAYPAL_CLIENT_ID}:${process.env.PAYPAL_SECRET}`
@@ -63,7 +62,7 @@ export async function POST(req: Request) {
           },
         ],
         application_context: {
-          brand_name: "My SaaS App",
+          brand_name: "SocialLike",
           landing_page: "NO_PREFERENCE",
           user_action: "PAY_NOW",
           shipping_preference: "NO_SHIPPING",

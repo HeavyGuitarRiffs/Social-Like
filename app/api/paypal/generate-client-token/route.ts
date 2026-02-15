@@ -1,5 +1,4 @@
-//app\api\paypal\generate-client-token\route.ts
-
+// app/api/paypal/generate-client-token/route.ts
 import { NextResponse } from "next/server";
 
 export async function POST() {
@@ -10,19 +9,18 @@ export async function POST() {
     const secret = process.env.PAYPAL_SECRET!;
     const auth = Buffer.from(`${clientId}:${secret}`).toString("base64");
 
-    const res = await fetch(
-      `${process.env.PAYPAL_ENV === "sandbox"
-        ? "https://api-m.sandbox.paypal.com"
-        : "https://api-m.paypal.com"
-      }/v1/identity/generate-token`,
-      {
-        method: "POST",
-        headers: {
-          Authorization: `Basic ${auth}`,
-          "Content-Type": "application/json",
-        },
-      }
-    );
+    const baseUrl =
+      process.env.PAYPAL_ENV === "live"
+        ? "https://api-m.paypal.com"
+        : "https://api-m.sandbox.paypal.com";
+
+    const res = await fetch(`${baseUrl}/v1/identity/generate-token`, {
+      method: "POST",
+      headers: {
+        Authorization: `Basic ${auth}`,
+        "Content-Type": "application/json",
+      },
+    });
 
     const data = await res.json();
 

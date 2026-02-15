@@ -16,68 +16,62 @@ type PlanId = "monthly" | "quarterly" | "semiannual" | "lifetime" | null;
 
 const tiers = [
   {
-    name: "Starter",
-    price: "$9 one-time", // ✅ updated price
-    duration: "1 month access",
+    name: "1 Month Access",
+    price: "$9",
+    duration: "One-time payment",
     planKey: "monthly" as PlanId,
-    subtitle: "For creators testing the waters",
+    subtitle: "Try the full creator analytics suite",
     features: [
-      "Track 1 social platform",
-      "Daily analytics refresh",
-      "Momentum & velocity scoring",
-      "Basic creator dashboard",
-      "Link-in-bio analytics (Starter tier)",
-    ],
-    cta: "Buy Starter",
-  },
-  {
-    name: "Pro",
-    price: "$29 one-time",
-    duration: "3 months access",
-    planKey: "quarterly" as PlanId,
-    subtitle: "For creators growing across multiple platforms",
-    features: [
+      "Full analytics dashboard",
+      "Insights & growth recommendations",
+      "Linktree auto-detection",
       "Track up to 5 platforms",
-      "Advanced analytics dashboard",
-      "Power Score (full access)",
-      "Posting windows & heatmaps",
-      "Link-in-bio analytics (Pro tier)",
-      "Landing page analytics",
+      "Daily refresh",
     ],
-    cta: "Buy Pro",
+    cta: "Unlock 1 Month",
   },
   {
-    name: "Creator Elite",
-    price: "$75 one-time",
-    duration: "6 months access",
-    planKey: "semiannual" as PlanId,
-    subtitle: "For creators building a long-term system",
+    name: "3 Months Access",
+    price: "$29",
+    duration: "One-time payment",
+    planKey: "quarterly" as PlanId,
+    subtitle: "For creators growing across platforms",
     features: [
-      "Everything in Pro",
+      "Everything in 1 Month",
       "Track up to 10 platforms",
-      "Advanced multi-platform insights",
-      "Creator growth benchmarks",
+      "Advanced insights",
+      "Posting windows & heatmaps",
+    ],
+    cta: "Unlock 3 Months",
+  },
+  {
+    name: "6 Months Access",
+    price: "$75",
+    duration: "One-time payment",
+    planKey: "semiannual" as PlanId,
+    subtitle: "For creators building long-term systems",
+    features: [
+      "Everything in 3 Months",
+      "Creator benchmarks",
       "Early access to new analytics modules",
       "Priority feature voting",
     ],
-    cta: "Buy Creator Elite",
+    cta: "Unlock 6 Months",
     bestValue: true,
   },
   {
-    name: "Teams / Company",
-    price: "From $149 one-time",
-    duration: "Lifetime access",
+    name: "Lifetime Access",
+    price: "$149",
+    duration: "One-time payment",
     planKey: "lifetime" as PlanId,
-    subtitle: "For agencies, teams, and companies",
+    subtitle: "For creators who want unlimited access forever",
     features: [
-      "Unlimited team members",
-      "Team-wide analytics dashboard",
-      "Cross-platform performance reporting",
-      "Exportable insights & reports",
-      "Admin controls",
-      "Dedicated support",
+      "Everything in 6 Months",
+      "Lifetime updates",
+      "Unlimited platforms",
+      "Priority support",
     ],
-    cta: "Buy Teams License",
+    cta: "Unlock Lifetime",
   },
 ];
 
@@ -91,10 +85,10 @@ export default function PricingPage() {
         {/* HEADER */}
         <div className="text-center space-y-4">
           <h1 className="text-5xl md:text-6xl font-extrabold tracking-tight text-base-content">
-            Lifetime access. One-time payment.
+            Unlock SocialLike Premium
           </h1>
           <p className="text-lg text-base-content/70">
-            No subscriptions. No recurring fees. Unlock your creator analytics forever.
+            One-time payments. No subscriptions. Full creator analytics.
           </p>
         </div>
 
@@ -113,15 +107,16 @@ export default function PricingPage() {
                   bg-base-200
                 "
               >
-                {/* BEST VALUE BADGE */}
                 {tier.bestValue && (
-                  <div className="
-                    absolute top-3 left-3 rounded-full px-3 py-1 text-xs font-bold 
-                    text-green-700 dark:text-green-300
-                    bg-green-200 dark:bg-green-900/40
-                    shadow-[0_0_12px_rgba(34,197,94,0.4)] dark:shadow-[0_0_12px_rgba(34,197,94,0.8)]
-                    animate-pulse
-                  ">
+                  <div
+                    className="
+                      absolute top-3 left-3 rounded-full px-3 py-1 text-xs font-bold 
+                      text-green-700 dark:text-green-300
+                      bg-green-200 dark:bg-green-900/40
+                      shadow-[0_0_12px_rgba(34,197,94,0.4)] dark:shadow-[0_0_12px_rgba(34,197,94,0.8)]
+                      animate-pulse
+                    "
+                  >
                     Best Value
                   </div>
                 )}
@@ -157,37 +152,36 @@ export default function PricingPage() {
                 </CardContent>
 
                 <CardFooter>
-  {!isSelected ? (
-    <div
-      className="w-full flex items-center justify-center py-4 rounded-xl bg-base-content/5 hover:bg-base-content/10 transition cursor-pointer"
-      onClick={() => setSelectedPlan(tier.planKey)}
-    >
-      <div className="w-full text-center font-semibold text-base-content">
-        {tier.cta}
-      </div>
-    </div>
-  ) : (
-    <div className="w-full flex flex-col items-center">
-      <p className="mb-2 text-sm font-medium text-base-content">
-        Complete your payment
-      </p>
-      <div className="w-full">
-        <PayPalCheckout
-          plan={tier.planKey!}        // ✅ non-null assertion
-          amount={tier.price.replace(/\D/g, '')}
-        />
-      </div>
-    </div>
-  )}
-</CardFooter>
-
+                  {!isSelected ? (
+                    <div
+                      className="w-full flex items-center justify-center py-4 rounded-xl bg-base-content/5 hover:bg-base-content/10 transition cursor-pointer"
+                      onClick={() => setSelectedPlan(tier.planKey)}
+                    >
+                      <div className="w-full text-center font-semibold text-base-content">
+                        {tier.cta}
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="w-full flex flex-col items-center">
+                      <p className="mb-2 text-sm font-medium text-base-content">
+                        Complete your payment
+                      </p>
+                      <div className="w-full">
+                        <PayPalCheckout
+                          plan={tier.planKey!}
+                          amount={tier.price.replace(/\D/g, "")}
+                        />
+                      </div>
+                    </div>
+                  )}
+                </CardFooter>
               </Card>
             );
           })}
         </div>
 
         <p className="text-center text-sm text-base-content/60">
-          Lifetime access · One-time payments · Secure PayPal checkout
+          One-time payments · Secure PayPal checkout · Instant access
         </p>
       </div>
     </section>

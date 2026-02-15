@@ -1,8 +1,7 @@
-//app\api\paypal\capture-order\route.ts
+// app/api/paypal/capture-order/route.ts
 import { NextResponse } from "next/server";
-import { createClient } from "@/lib/supabase/client"; // optional: your DB
+import { createClient } from "@/lib/supabase/client";
 
-// Map plan keys to expected amounts (match your tiers)
 const PLAN_PRICES: Record<string, string> = {
   monthly: "9.00",
   quarterly: "29.00",
@@ -22,9 +21,9 @@ export async function POST(req: Request) {
     }
 
     const baseUrl =
-      process.env.PAYPAL_ENV === "sandbox"
-        ? "https://api-m.sandbox.paypal.com"
-        : "https://api-m.paypal.com";
+      process.env.PAYPAL_ENV === "live"
+        ? "https://api-m.paypal.com"
+        : "https://api-m.sandbox.paypal.com";
 
     const auth = Buffer.from(
       `${process.env.PAYPAL_CLIENT_ID}:${process.env.PAYPAL_SECRET}`
@@ -39,16 +38,13 @@ export async function POST(req: Request) {
     });
 
     const data = await response.json();
-
     console.log("💳 [CAPTURE ORDER] PayPal response:", data);
 
-    // Verify payment completed
     if (data.status !== "COMPLETED") {
       console.error("❌ [CAPTURE ORDER] Payment not completed:", data);
       return NextResponse.json({ error: "Payment not completed", data }, { status: 400 });
     }
 
-    // Verify amount matches the plan
     const captureAmount = data.purchase_units?.[0]?.payments?.captures?.[0]?.amount?.value;
     const expectedAmount = PLAN_PRICES[plan];
 
@@ -63,21 +59,6 @@ export async function POST(req: Request) {
         { status: 400 }
       );
     }
-
-    // Optional: record subscription/payment in your DB
-    /*
-    const supabase = createClient();
-    const { error } = await supabase.from("subscriptions").insert([
-      {
-        user_id: "USER_ID_HERE", // pass from frontend / JWT
-        plan,
-        amount: captureAmount,
-        order_id: orderID,
-        status: "active",
-      },
-    ]);
-    if (error) throw error;
-    */
 
     console.log("💳 [CAPTURE ORDER] SUCCESS:", {
       plan,
